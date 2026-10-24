@@ -181,11 +181,6 @@ package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
   }
 }
 
-' ---- vertical stacking of the groups ----
-service -[hidden]down- strategy
-strategy -[hidden]down- model
-model -[hidden]down- template
-
 ' ---- Model ----
 Volunteer -up-|> Person
 Volunteer "1" o-- "*" Task : tasks
@@ -202,7 +197,7 @@ AssignmentStrategy ..> Volunteer : picks
 AssignmentStrategy ..> Task
 
 ' ---- Template Method ----
-note right of Certificate
+note bottom of Certificate
   issue() is final:
   title -> recipient -> achievement -> signature
 end note
