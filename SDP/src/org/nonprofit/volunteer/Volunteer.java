@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -80,7 +81,11 @@ public class Volunteer extends Person {
         return preferredCategories.contains(normalize(category));
     }
 
-    /** True if an unfinished task already takes this volunteer's day. */
+    /**
+     * True if an unfinished task already takes this volunteer's day.
+     * Tasks are booked by day of the week, not by date, so a completed task
+     * (for example last Saturday's) must not block that weekday forever.
+     */
     public boolean isBookedOn(DayOfWeek day) {
         return tasks.stream().anyMatch(t -> !t.isCompleted() && t.getDay() == day);
     }
@@ -124,6 +129,7 @@ public class Volunteer extends Person {
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("Value is required");
         }
-        return text.trim().toLowerCase();
+        // Locale.ROOT so matching does not change with the computer's language (e.g. Turkish "I").
+        return text.trim().toLowerCase(Locale.ROOT);
     }
 }
