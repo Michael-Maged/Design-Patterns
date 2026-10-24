@@ -9,7 +9,7 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
 | 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory, Template Method | `output/donation.puml` | Not started |
-| 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | `output/volunteer.puml` | Not started |
+| 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` | Not started |
 | 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator | `output/communication.puml` | Not started |
@@ -27,6 +27,15 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 
 Other features: capacity limits, a **waitlist with automatic promotion** when someone cancels, check-in and attendance reports, ticket revenue, fundraiser pledge progress, and reminders for events starting within a time window. `EventService` is the module's entry point and is what the Facade will call.
 
+## Volunteers module (Student 2)
+
+| Pattern | Where | What it does |
+|---|---|---|
+| **Strategy** | `AssignmentStrategy`, `SkillBasedAssignment`, `AvailabilityBasedAssignment`, `PreferenceBasedAssignment`, `AssignmentMode` | `VolunteerService` holds one strategy that picks who gets a task. It can be swapped at runtime (or chosen from user input such as `"preference"`), so the same task can go to a different volunteer. |
+| **Template Method** | `Certificate`, `HoursCertificate`, `EventParticipationCertificate` | `Certificate.issue()` is final and always prints title, recipient, achievement and signature. Subclasses supply only the title and achievement, and can override the `isEligible()` hook. |
+
+Other features: volunteer profiles (skills, available days, preferred task categories), one task per volunteer per day, hour logging, a **leaderboard by hours** (extended requirement 4), suggestions without assigning, and freeing a removed volunteer's open tasks. Assignments are published on the `EventBus` as `VOLUNTEER_ASSIGNED` for the Communication module. `VolunteerService` is the module's entry point and is what the Facade will call.
+
 ## Running
 
 From the `SDP` folder:
@@ -34,9 +43,10 @@ From the `SDP` folder:
 ```sh
 javac --release 17 -d bin $(find src -name "*.java")
 java -cp bin org.nonprofit.event.EventDemo
+java -cp bin org.nonprofit.volunteer.VolunteerDemo
 ```
 
-In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java` and click **Run**.
+In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java` or `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` and click **Run**.
 
 ## Diagrams
 

@@ -1,0 +1,221 @@
+@startuml volunteer
+' Volunteers module (Student 2): class diagram organised by design pattern.
+' Written by hand in the same layout as event.puml; regenerate with the UML generator to refresh.
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 60
+hide circle
+hide empty members
+top to bottom direction
+
+package "org.nonprofit.core (shared)" as core #F5F5F5 {
+  abstract class Person {
+    -id: String
+    -name: String
+    -email: String
+    -phone: String
+    -preferredContact: ContactPreference
+  }
+  class EventBus <<Singleton>> {
+    +{static} getInstance(): EventBus
+    +publish(event: SystemEvent): void
+  }
+}
+
+package "Model: volunteers, tasks, hours" as model #EEF7EE {
+  class Volunteer {
+    -{static} NEXT_ID: AtomicInteger
+    -skills: Set<String>
+    -availability: EnumSet<DayOfWeek>
+    -preferredCategories: Set<String>
+    -tasks: List<Task>
+    -hourLog: List<HourEntry>
+    --
+    +Volunteer(name: String, email: String, phone: String, preferredContact: ContactPreference)
+    +Volunteer(name: String, email: String, phone: String)
+    .. profile ..
+    +addSkill(skill: String): Volunteer
+    +removeSkill(skill: String): Volunteer
+    +addAvailability(days: DayOfWeek...): Volunteer
+    +removeAvailability(day: DayOfWeek): Volunteer
+    +addPreference(category: String): Volunteer
+    +removePreference(category: String): Volunteer
+    .. queries ..
+    +hasSkill(skill: String): boolean
+    +isAvailableOn(day: DayOfWeek): boolean
+    +prefers(category: String): boolean
+    +isBookedOn(day: DayOfWeek): boolean
+    +openTaskCount(): int
+    +getTotalHours(): double
+    +summary(): String
+    .. bookkeeping (package-private) ..
+    ~assign(task: Task): void
+    ~unassign(task: Task): void
+    ~recordHours(entry: HourEntry): void
+  }
+
+  class Task {
+    -{static} NEXT_ID: AtomicInteger
+    -id: String
+    -name: String
+    -requiredSkill: String
+    -day: DayOfWeek
+    -category: String
+    -eventName: String
+    -assignedVolunteer: Volunteer
+    -completed: boolean
+    --
+    +Task(name: String, requiredSkill: String, day: DayOfWeek, category: String, eventName: String)
+    +Task(name: String, requiredSkill: String, day: DayOfWeek, category: String)
+    +isAssigned(): boolean
+    +isCompleted(): boolean
+    +summary(): String
+    ~setAssignedVolunteer(volunteer: Volunteer): void
+    ~markCompleted(): void
+  }
+
+  class HourEntry <<record>> {
+    +task: Task
+    +hours: double
+    +date: LocalDate
+  }
+}
+
+package "STRATEGY: choosing a volunteer for a task" as strategy #EAF2FB {
+  interface AssignmentStrategy <<Strategy>> {
+    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +name(): String
+  }
+
+  class SkillBasedAssignment <<ConcreteStrategy>> {
+    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +name(): String
+  }
+
+  class AvailabilityBasedAssignment <<ConcreteStrategy>> {
+    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +name(): String
+  }
+
+  class PreferenceBasedAssignment <<ConcreteStrategy>> {
+    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +name(): String
+  }
+
+  enum AssignmentMode {
+    SKILL
+    AVAILABILITY
+    PREFERENCE
+    --
+    +create(): AssignmentStrategy
+    +{static} fromString(input: String): AssignmentMode
+  }
+}
+
+package "TEMPLATE METHOD: certificates" as template #FDF3E7 {
+  abstract class Certificate <<AbstractClass>> {
+    -{static} BORDER: String
+    #volunteer: Volunteer
+    #issueDate: LocalDate
+    --
+    +issue(): String
+    .. steps ..
+    #{abstract} title(): String
+    #{abstract} achievement(): String
+    .. hooks ..
+    #isEligible(): boolean
+    #recipient(): String
+    #signature(): String
+  }
+
+  class HoursCertificate {
+    +HoursCertificate(volunteer: Volunteer, issueDate: LocalDate)
+    #title(): String
+    #achievement(): String
+    #isEligible(): boolean
+  }
+
+  class EventParticipationCertificate {
+    -eventName: String
+    --
+    +EventParticipationCertificate(volunteer: Volunteer, eventName: String, issueDate: LocalDate)
+    #title(): String
+    #achievement(): String
+    #isEligible(): boolean
+    -entriesForEvent(): List<HourEntry>
+  }
+}
+
+package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
+  class VolunteerService <<Context>> {
+    -volunteers: Map<String, Volunteer>
+    -tasks: Map<String, Task>
+    -bus: EventBus
+    -strategy: AssignmentStrategy
+    --
+    +registerVolunteer(volunteer: Volunteer): Volunteer
+    +findVolunteer(volunteerId: String): Optional<Volunteer>
+    +listVolunteers(): List<Volunteer>
+    +removeVolunteer(volunteerId: String): boolean
+    +addTask(task: Task): Task
+    +findTask(taskId: String): Optional<Task>
+    +listTasks(): List<Task>
+    +openTasks(): List<Task>
+    +setStrategy(strategy: AssignmentStrategy): void
+    +setStrategy(mode: AssignmentMode): void
+    +suggest(taskId: String): Optional<Volunteer>
+    +assign(taskId: String): Optional<Volunteer>
+    +assignAllOpen(): int
+    +unassign(taskId: String): void
+    +logHours(taskId: String, hours: double, date: LocalDate): void
+    +leaderboard(top: int): List<Volunteer>
+    +leaderboardReport(top: int): String
+    +issueHoursCertificate(volunteerId: String, date: LocalDate): String
+    +issueParticipationCertificate(volunteerId: String, eventName: String, date: LocalDate): String
+    -freeOn(task: Task): List<Volunteer>
+  }
+
+  class VolunteerDemo {
+    +{static} main(args: String[]): void
+  }
+}
+
+' ---- vertical stacking of the groups ----
+service -[hidden]down- strategy
+strategy -[hidden]down- model
+model -[hidden]down- template
+
+' ---- Model ----
+Volunteer -up-|> Person
+Volunteer "1" o-- "*" Task : tasks
+Task "*" --> "0..1" Volunteer : assignedVolunteer
+Volunteer "1" *-- "*" HourEntry : hourLog
+HourEntry --> Task
+
+' ---- Strategy ----
+SkillBasedAssignment .up.|> AssignmentStrategy
+AvailabilityBasedAssignment .up.|> AssignmentStrategy
+PreferenceBasedAssignment .up.|> AssignmentStrategy
+AssignmentMode ..> AssignmentStrategy : <<creates>>
+AssignmentStrategy ..> Volunteer : picks
+AssignmentStrategy ..> Task
+
+' ---- Template Method ----
+note right of Certificate
+  issue() is final:
+  title -> recipient -> achievement -> signature
+end note
+HoursCertificate -up-|> Certificate
+EventParticipationCertificate -up-|> Certificate
+Certificate --> Volunteer
+
+' ---- Service ----
+VolunteerDemo ..> VolunteerService
+VolunteerService "1" o-- "1" AssignmentStrategy : strategy
+VolunteerService "1" o-- "*" Volunteer
+VolunteerService "1" o-- "*" Task
+VolunteerService ..> AssignmentMode
+VolunteerService ..> Certificate : <<issues>>
+VolunteerService ..> EventBus : publishes VOLUNTEER_ASSIGNED
+@enduml
