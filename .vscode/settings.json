@@ -1,0 +1,7 @@
+{
+    "java.project.sourcePaths": ["SDP/src"],
+    "java.project.outputPath": "SDP/bin",
+    "java.project.referencedLibraries": [
+        "SDP/lib/**/*.jar"
+    ]
+}
