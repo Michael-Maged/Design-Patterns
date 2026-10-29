@@ -20,8 +20,9 @@ public abstract class Donation {
         if (donor == null) {
             throw new IllegalArgumentException("Donor is required");
         }
-        if (value <= 0) {
-            throw new IllegalArgumentException("Donation amount must be positive");
+        // NaN ("not a number") would slip past "value <= 0", so it is checked too.
+        if (Double.isNaN(value) || value <= 0) {
+            throw new IllegalArgumentException("Donation amount must be a positive number");
         }
         if (date == null) {
             throw new IllegalArgumentException("Donation date is required");
