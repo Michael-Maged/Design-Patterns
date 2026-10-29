@@ -10,8 +10,8 @@ public class Campaign {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Campaign name is required");
         }
-        if (goal <= 0) {
-            throw new IllegalArgumentException("Campaign goal must be positive");
+        if (Double.isNaN(goal) || goal <= 0) {
+            throw new IllegalArgumentException("Campaign goal must be a positive number");
         }
         this.name = name;
         this.goal = goal;
