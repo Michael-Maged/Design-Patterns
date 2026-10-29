@@ -2,12 +2,12 @@ package org.nonprofit.volunteer;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
+import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.SystemObserver;
 
 /**
  * Stand-alone walkthrough of the Volunteers module, showing each pattern.
@@ -18,8 +18,12 @@ public class VolunteerDemo {
     public static void main(String[] args) {
         // Until the Communication module is merged, a simple subscriber
         // stands in for it and prints what it would send.
-        EventBus.getInstance().subscribe(SystemEventType.VOLUNTEER_ASSIGNED,
-                e -> System.out.println("    [EventBus] " + e));
+        EventBus.getInstance().subscribe(SystemEventType.VOLUNTEER_ASSIGNED, new SystemObserver() {
+            @Override
+            public void onEvent(SystemEvent event) {
+                System.out.println("    [EventBus] " + event);
+            }
+        });
 
         VolunteerService service = new VolunteerService();
         LocalDate today = LocalDate.of(2026, 11, 1);
@@ -51,14 +55,16 @@ public class VolunteerDemo {
         service.logHours(reading.getId(), 3, today.minusDays(6));
         service.assign(service.addTask(new Task("Van driver", "driving", DayOfWeek.SUNDAY, "logistics")).getId());
         service.assign(service.addTask(new Task("Tutor", "teaching", DayOfWeek.MONDAY, "education")).getId());
-        service.listVolunteers().forEach(v -> System.out.println("  " + v.summary()));
+        for (Volunteer v : service.listVolunteers()) {
+            System.out.println("  " + v.summary());
+        }
 
         heading("2. STRATEGY - the same task, three strategies, three answers");
         Task medicalTent = service.addTask(new Task("Medical tent", "first aid", DayOfWeek.SATURDAY,
                 "health", "Neighbourhood Food Drive"));
         System.out.println("  " + medicalTent.summary());
-        List<AssignmentStrategy> strategies = List.of(
-                new SkillBasedAssignment(), new AvailabilityBasedAssignment(), new PreferenceBasedAssignment());
+        AssignmentStrategy[] strategies = {
+                new SkillBasedAssignment(), new AvailabilityBasedAssignment(), new PreferenceBasedAssignment() };
         for (AssignmentStrategy strategy : strategies) {
             service.setStrategy(strategy);
             System.out.printf("  %-52s -> %s%n", strategy.name(), name(service.suggest(medicalTent.getId())));
@@ -75,7 +81,9 @@ public class VolunteerDemo {
         Task extraMedic = service.addTask(new Task("Second medic", "first aid", DayOfWeek.SATURDAY, "health"));
         System.out.println("  Filled " + service.assignAllOpen() + " task(s); nobody is free for "
                 + extraMedic + " (one task per day each)");
-        service.listTasks().forEach(t -> System.out.println("  " + t.summary()));
+        for (Task t : service.listTasks()) {
+            System.out.println("  " + t.summary());
+        }
 
         heading("5. Logging hours and the leaderboard");
         for (Task task : service.listTasks()) {
@@ -99,11 +107,13 @@ public class VolunteerDemo {
         heading("7. Removing a volunteer frees their open tasks");
         service.removeVolunteer(nour.getId());
         service.removeVolunteer(karim.getId());
-        service.openTasks().forEach(t -> System.out.println("  back in the pool: " + t.summary()));
+        for (Task t : service.openTasks()) {
+            System.out.println("  back in the pool: " + t.summary());
+        }
     }
 
-    private static String name(Optional<Volunteer> volunteer) {
-        return volunteer.map(Volunteer::getName).orElse("nobody fits");
+    private static String name(Volunteer volunteer) {
+        return volunteer == null ? "nobody fits" : volunteer.getName();
     }
 
     private static void heading(String title) {

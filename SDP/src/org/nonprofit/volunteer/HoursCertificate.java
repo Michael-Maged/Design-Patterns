@@ -16,7 +16,12 @@ public class HoursCertificate extends Certificate {
 
     @Override
     protected String achievement() {
-        long tasksDone = volunteer.getTasks().stream().filter(Task::isCompleted).count();
+        int tasksDone = 0;
+        for (Task task : volunteer.getTasks()) {
+            if (task.isCompleted()) {
+                tasksDone++;
+            }
+        }
         return String.format("for contributing %.1f hours of service%nacross %d completed task(s).",
                 volunteer.getTotalHours(), tasksDone);
     }
