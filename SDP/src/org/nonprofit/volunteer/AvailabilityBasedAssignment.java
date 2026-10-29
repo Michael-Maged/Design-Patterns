@@ -1,8 +1,6 @@
 package org.nonprofit.volunteer;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * STRATEGY pattern (concrete strategy): anyone available that day
@@ -12,10 +10,17 @@ import java.util.Optional;
 public class AvailabilityBasedAssignment implements AssignmentStrategy {
 
     @Override
-    public Optional<Volunteer> pick(Task task, List<Volunteer> candidates) {
-        return candidates.stream()
-                .filter(v -> v.isAvailableOn(task.getDay()))
-                .min(Comparator.comparingInt(Volunteer::openTaskCount));
+    public Volunteer pick(Task task, List<Volunteer> candidates) {
+        Volunteer best = null;
+        for (Volunteer v : candidates) {
+            if (!v.isAvailableOn(task.getDay())) {
+                continue;
+            }
+            if (best == null || v.openTaskCount() < best.openTaskCount()) {
+                best = v;
+            }
+        }
+        return best;
     }
 
     @Override

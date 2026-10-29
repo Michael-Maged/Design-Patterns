@@ -1,29 +1,33 @@
 package org.nonprofit.volunteer;
 
 import java.util.Locale;
-import java.util.function.Supplier;
 
-/** The assignment strategies a user can pick from a menu; each knows how to build its strategy. */
+/** The assignment strategies a user can pick from a menu. */
 public enum AssignmentMode {
-    SKILL(SkillBasedAssignment::new),
-    AVAILABILITY(AvailabilityBasedAssignment::new),
-    PREFERENCE(PreferenceBasedAssignment::new);
+    SKILL,
+    AVAILABILITY,
+    PREFERENCE;
 
-    private final Supplier<AssignmentStrategy> creator;
-
-    AssignmentMode(Supplier<AssignmentStrategy> creator) {
-        this.creator = creator;
-    }
-
+    /** Makes a new strategy object for this menu choice. */
     public AssignmentStrategy create() {
-        return creator.get();
+        switch (this) {
+            case SKILL:
+                return new SkillBasedAssignment();
+            case AVAILABILITY:
+                return new AvailabilityBasedAssignment();
+            default:
+                return new PreferenceBasedAssignment();
+        }
     }
 
     /** Parses user input such as "skill" or " Preference ". */
     public static AssignmentMode fromString(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("Unknown assignment mode: null");
+        }
         try {
             return valueOf(input.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException | NullPointerException e) {
+        } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unknown assignment mode: " + input);
         }
     }

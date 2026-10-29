@@ -2,12 +2,10 @@ package org.nonprofit.volunteer;
 
 import java.time.DayOfWeek;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.Person;
@@ -18,16 +16,16 @@ import org.nonprofit.core.Person;
  * Skills and categories are stored lower-case so "First Aid" matches "first aid".
  */
 public class Volunteer extends Person {
-    private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
+    private static int nextId = 1;
 
     private final Set<String> skills = new LinkedHashSet<>();
-    private final EnumSet<DayOfWeek> availability = EnumSet.noneOf(DayOfWeek.class);
+    private final Set<DayOfWeek> availability = new LinkedHashSet<>();
     private final Set<String> preferredCategories = new LinkedHashSet<>();
     private final List<Task> tasks = new ArrayList<>();
     private final List<HourEntry> hourLog = new ArrayList<>();
 
     public Volunteer(String name, String email, String phone, ContactPreference preferredContact) {
-        super("VOL-" + NEXT_ID.getAndIncrement(), name, email, phone, preferredContact);
+        super("VOL-" + nextId++, name, email, phone, preferredContact);
     }
 
     /** Volunteers are reached by SMS unless they ask otherwise. */
@@ -48,7 +46,9 @@ public class Volunteer extends Person {
     }
 
     public Volunteer addAvailability(DayOfWeek... days) {
-        availability.addAll(List.of(days));
+        for (DayOfWeek day : days) {
+            availability.add(day);
+        }
         return this;
     }
 
@@ -87,15 +87,30 @@ public class Volunteer extends Person {
      * (for example last Saturday's) must not block that weekday forever.
      */
     public boolean isBookedOn(DayOfWeek day) {
-        return tasks.stream().anyMatch(t -> !t.isCompleted() && t.getDay() == day);
+        for (Task task : tasks) {
+            if (!task.isCompleted() && task.getDay() == day) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public int openTaskCount() {
-        return (int) tasks.stream().filter(t -> !t.isCompleted()).count();
+        int count = 0;
+        for (Task task : tasks) {
+            if (!task.isCompleted()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public double getTotalHours() {
-        return hourLog.stream().mapToDouble(HourEntry::hours).sum();
+        double total = 0;
+        for (HourEntry entry : hourLog) {
+            total += entry.getHours();
+        }
+        return total;
     }
 
     // ---- Bookkeeping (driven by VolunteerService) ----
@@ -112,13 +127,13 @@ public class Volunteer extends Person {
         hourLog.add(entry);
     }
 
-    // ---- Getters ----
+    // ---- Getters (copies, so callers cannot change the volunteer's data) ----
 
-    public Set<String> getSkills() { return Set.copyOf(skills); }
-    public Set<DayOfWeek> getAvailability() { return EnumSet.copyOf(availability); }
-    public Set<String> getPreferredCategories() { return Set.copyOf(preferredCategories); }
-    public List<Task> getTasks() { return List.copyOf(tasks); }
-    public List<HourEntry> getHourLog() { return List.copyOf(hourLog); }
+    public Set<String> getSkills() { return new LinkedHashSet<>(skills); }
+    public Set<DayOfWeek> getAvailability() { return new LinkedHashSet<>(availability); }
+    public Set<String> getPreferredCategories() { return new LinkedHashSet<>(preferredCategories); }
+    public List<Task> getTasks() { return new ArrayList<>(tasks); }
+    public List<HourEntry> getHourLog() { return new ArrayList<>(hourLog); }
 
     public String summary() {
         return String.format("%s %s | skills: %s | days: %s | prefers: %s | %.1f h, %d open task(s)",

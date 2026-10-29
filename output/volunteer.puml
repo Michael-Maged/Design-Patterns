@@ -25,9 +25,9 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
 
 package "Model: volunteers, tasks, hours" as model #EEF7EE {
   class Volunteer {
-    -{static} NEXT_ID: AtomicInteger
+    -{static} nextId: int
     -skills: Set<String>
-    -availability: EnumSet<DayOfWeek>
+    -availability: Set<DayOfWeek>
     -preferredCategories: Set<String>
     -tasks: List<Task>
     -hourLog: List<HourEntry>
@@ -56,7 +56,7 @@ package "Model: volunteers, tasks, hours" as model #EEF7EE {
   }
 
   class Task {
-    -{static} NEXT_ID: AtomicInteger
+    -{static} nextId: int
     -id: String
     -name: String
     -requiredSkill: String
@@ -75,32 +75,38 @@ package "Model: volunteers, tasks, hours" as model #EEF7EE {
     ~markCompleted(): void
   }
 
-  class HourEntry <<record>> {
-    +task: Task
-    +hours: double
-    +date: LocalDate
+  class HourEntry {
+    -task: Task
+    -hours: double
+    -date: LocalDate
+    --
+    +HourEntry(task: Task, hours: double, date: LocalDate)
+    +getTask(): Task
+    +getHours(): double
+    +getDate(): LocalDate
   }
 }
 
 package "STRATEGY: choosing a volunteer for a task" as strategy #EAF2FB {
   interface AssignmentStrategy <<Strategy>> {
-    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +pick(task: Task, candidates: List<Volunteer>): Volunteer
     +name(): String
   }
 
   class SkillBasedAssignment <<ConcreteStrategy>> {
-    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +pick(task: Task, candidates: List<Volunteer>): Volunteer
     +name(): String
   }
 
   class AvailabilityBasedAssignment <<ConcreteStrategy>> {
-    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +pick(task: Task, candidates: List<Volunteer>): Volunteer
     +name(): String
   }
 
   class PreferenceBasedAssignment <<ConcreteStrategy>> {
-    +pick(task: Task, candidates: List<Volunteer>): Optional<Volunteer>
+    +pick(task: Task, candidates: List<Volunteer>): Volunteer
     +name(): String
+    -isBetter(v: Volunteer, best: Volunteer, task: Task): boolean
   }
 
   enum AssignmentMode {
@@ -155,17 +161,17 @@ package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
     -strategy: AssignmentStrategy
     --
     +registerVolunteer(volunteer: Volunteer): Volunteer
-    +findVolunteer(volunteerId: String): Optional<Volunteer>
+    +findVolunteer(volunteerId: String): Volunteer
     +listVolunteers(): List<Volunteer>
     +removeVolunteer(volunteerId: String): boolean
     +addTask(task: Task): Task
-    +findTask(taskId: String): Optional<Task>
+    +findTask(taskId: String): Task
     +listTasks(): List<Task>
     +openTasks(): List<Task>
     +setStrategy(strategy: AssignmentStrategy): void
     +setStrategy(mode: AssignmentMode): void
-    +suggest(taskId: String): Optional<Volunteer>
-    +assign(taskId: String): Optional<Volunteer>
+    +suggest(taskId: String): Volunteer
+    +assign(taskId: String): Volunteer
     +assignAllOpen(): int
     +unassign(taskId: String): void
     +logHours(taskId: String, hours: double, date: LocalDate): void

@@ -1,7 +1,6 @@
 package org.nonprofit.volunteer;
 
 import java.time.DayOfWeek;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A piece of volunteer work: what skill it needs, which day it happens,
@@ -9,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * the event it is part of. A task has at most one volunteer.
  */
 public class Task {
-    private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
+    private static int nextId = 1;
 
     private final String id;
     private final String name;
@@ -27,7 +26,7 @@ public class Task {
         if (day == null) {
             throw new IllegalArgumentException("Task day is required");
         }
-        this.id = "TSK-" + NEXT_ID.getAndIncrement();
+        this.id = "TSK-" + nextId++;
         this.name = name;
         this.requiredSkill = Volunteer.normalize(requiredSkill);
         this.day = day;

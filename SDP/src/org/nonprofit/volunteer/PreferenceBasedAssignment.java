@@ -1,8 +1,6 @@
 package org.nonprofit.volunteer;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * STRATEGY pattern (concrete strategy): only available volunteers who
@@ -12,12 +10,26 @@ import java.util.Optional;
 public class PreferenceBasedAssignment implements AssignmentStrategy {
 
     @Override
-    public Optional<Volunteer> pick(Task task, List<Volunteer> candidates) {
-        Comparator<Volunteer> bySkill = Comparator.comparing(v -> !v.hasSkill(task.getRequiredSkill()));
-        return candidates.stream()
-                .filter(v -> v.isAvailableOn(task.getDay()))
-                .filter(v -> v.prefers(task.getCategory()))
-                .min(bySkill.thenComparingInt(Volunteer::openTaskCount));
+    public Volunteer pick(Task task, List<Volunteer> candidates) {
+        Volunteer best = null;
+        for (Volunteer v : candidates) {
+            if (!v.isAvailableOn(task.getDay()) || !v.prefers(task.getCategory())) {
+                continue;
+            }
+            if (best == null || isBetter(v, best, task)) {
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    private boolean isBetter(Volunteer v, Volunteer best, Task task) {
+        boolean vSkilled = v.hasSkill(task.getRequiredSkill());
+        boolean bestSkilled = best.hasSkill(task.getRequiredSkill());
+        if (vSkilled != bestSkilled) {
+            return vSkilled;
+        }
+        return v.openTaskCount() < best.openTaskCount();
     }
 
     @Override
