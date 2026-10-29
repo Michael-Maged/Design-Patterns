@@ -6,7 +6,8 @@ import java.time.LocalDate;
  * Base class for all donations. {@code value} is the money given, or the
  * estimated value of goods for an in-kind donation.
  *
- * Concrete types are created only through {@link DonationFactory}.
+ * FACTORY METHOD pattern (product). Concrete types are created only by the
+ * {@link DonationProcessor} subclasses.
  */
 public abstract class Donation {
     private final String id;
