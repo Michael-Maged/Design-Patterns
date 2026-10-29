@@ -170,8 +170,9 @@ public class VolunteerService {
         if (task.isCompleted()) {
             throw new IllegalStateException("Hours for " + task.getName() + " were already logged");
         }
-        if (hours <= 0) {
-            throw new IllegalArgumentException("Hours must be positive");
+        // NaN ("not a number") would slip past "hours <= 0", so it is checked too.
+        if (Double.isNaN(hours) || hours <= 0) {
+            throw new IllegalArgumentException("Hours must be a positive number");
         }
         task.getAssignedVolunteer().recordHours(new HourEntry(task, hours, date));
         task.markCompleted();
@@ -179,6 +180,9 @@ public class VolunteerService {
 
     /** Volunteers ranked by total hours, most first (equal hours keep their registration order). */
     public List<Volunteer> leaderboard(int top) {
+        if (top < 0) {
+            throw new IllegalArgumentException("Leaderboard size cannot be negative");
+        }
         List<Volunteer> ranked = new ArrayList<>();
         for (Volunteer v : volunteers.values()) {
             // Insert before the first volunteer with fewer hours.
