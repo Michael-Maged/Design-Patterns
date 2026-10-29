@@ -4,7 +4,9 @@ import java.time.LocalDate;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
+import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.SystemObserver;
 
 /**
  * Stand-alone walkthrough of the Donations module, showing each pattern.
@@ -16,7 +18,12 @@ public class DonationDemo {
         // Until the Communication module is merged, a simple subscriber
         // stands in for it and prints the thank-you it would send.
         EventBus bus = EventBus.getInstance();
-        bus.subscribe(SystemEventType.DONATION_RECEIVED, e -> System.out.println("    [EventBus] " + e));
+        bus.subscribe(SystemEventType.DONATION_RECEIVED, new SystemObserver() {
+            @Override
+            public void onEvent(SystemEvent event) {
+                System.out.println("    [EventBus] " + event);
+            }
+        });
 
         DonationService service = new DonationService();
         LocalDate today = LocalDate.of(2026, 11, 1);
@@ -27,7 +34,10 @@ public class DonationDemo {
         Donor bakery = service.registerDonor(new Donor("El Nour Bakery", "orders@elnour.example", "+20120000003"));
         service.createCampaign("Winter Blankets", 15_000);
 
-        heading("1. FACTORY - one call, three kinds of donation");
+        heading("1. FACTORY METHOD - each creator decides which donation to build");
+        for (DonationType type : DonationType.values()) {
+            System.out.println("  " + type + " is handled by " + service.processorFor(type).getClass().getSimpleName());
+        }
         Donation online = service.recordDonation(hany.getId(), DonationType.ONLINE, today.minusMonths(9),
                 DonationDetails.of(500).reference("PAY-88213").recurring());
         Donation check = service.recordDonation(rania.getId(), "check", today.minusMonths(2),
@@ -47,7 +57,9 @@ public class DonationDemo {
         heading("3. Campaign goal and progress");
         service.recordDonation(hany.getId(), DonationType.ONLINE, today.minusDays(1),
                 DonationDetails.of(4_500).reference("PAY-90410").campaign("winter blankets"));
-        service.listCampaigns().forEach(c -> System.out.println("  " + c.summary()));
+        for (Campaign c : service.listCampaigns()) {
+            System.out.println("  " + c.summary());
+        }
 
         heading("4. TEMPLATE METHOD - receipts and a tax statement, one layout");
         System.out.println(service.receipt(online.getId(), today));
@@ -61,7 +73,9 @@ public class DonationDemo {
 
         heading("5. Totals and top donors");
         System.out.println(service.summaryReport());
-        service.topDonors(3).forEach(d -> System.out.println("  " + d.summary()));
+        for (Donor d : service.topDonors(3)) {
+            System.out.println("  " + d.summary());
+        }
 
         heading("6. Donor records are kept while they have donations");
         try {

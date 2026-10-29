@@ -26,7 +26,7 @@ public class DonationReceipt extends DonationDocument {
         if (donation.getCampaign() != null) {
             sb.append(String.format("%nCampaign:  %s", donation.getCampaign()));
         }
-        if (donation instanceof OnlineDonation online && online.isRecurringMonthly()) {
+        if (donation instanceof OnlineDonation && ((OnlineDonation) donation).isRecurringMonthly()) {
             sb.append(String.format("%nThis is a recurring monthly gift. Thank you for giving every month."));
         }
         return sb.toString();

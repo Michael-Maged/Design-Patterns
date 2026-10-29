@@ -35,10 +35,15 @@ public class TaxDeductionStatement extends DonationDocument {
 
     @Override
     protected String totals() {
-        double money = donations().stream().filter(d -> d.getType() != DonationType.IN_KIND)
-                .mapToDouble(Donation::getValue).sum();
-        double goods = donations().stream().filter(d -> d.getType() == DonationType.IN_KIND)
-                .mapToDouble(Donation::getValue).sum();
+        double money = 0;
+        double goods = 0;
+        for (Donation d : donations()) {
+            if (d.getType() == DonationType.IN_KIND) {
+                goods += d.getValue();
+            } else {
+                money += d.getValue();
+            }
+        }
         return String.format("%-28s %12s%n%-28s %12s%n%-28s %12s",
                 "Money donations:", money(money),
                 "Goods (estimated value):", money(goods),

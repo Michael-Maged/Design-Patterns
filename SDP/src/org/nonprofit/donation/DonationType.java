@@ -2,7 +2,7 @@ package org.nonprofit.donation;
 
 import java.util.Locale;
 
-/** The donation methods the {@link DonationFactory} knows how to build. */
+/** The donation methods; each one has its own {@link DonationProcessor} that builds it. */
 public enum DonationType {
     ONLINE,
     CHECK,

@@ -1,13 +1,11 @@
 package org.nonprofit.donation;
 
 import java.time.LocalDate;
-import java.util.Comparator;
-import java.util.EnumMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
@@ -15,15 +13,38 @@ import org.nonprofit.core.SystemEventType;
 
 /**
  * Entry point of the Donations module (the Facade in core calls this).
- * Keeps donors, donations and campaigns, creates donations through the
- * {@link DonationFactory}, publishes DONATION_RECEIVED on the EventBus and
- * produces receipts and tax statements.
+ * Keeps donors, donations and campaigns, hands each new donation to the
+ * {@link DonationProcessor} for its method, publishes DONATION_RECEIVED on
+ * the EventBus and produces receipts and tax statements.
+ *
+ * It depends only on the abstract creator and the abstract {@link Donation},
+ * never on a concrete donation class (Dependency Inversion Principle).
  */
 public class DonationService {
     private final Map<String, Donor> donors = new LinkedHashMap<>();
     private final Map<String, Donation> donations = new LinkedHashMap<>();
     private final Map<String, Campaign> campaigns = new LinkedHashMap<>();
+    private final Map<DonationType, DonationProcessor> processors = new LinkedHashMap<>();
     private final EventBus bus = EventBus.getInstance();
+
+    public DonationService() {
+        processors.put(DonationType.ONLINE, new OnlineDonationProcessor());
+        processors.put(DonationType.CHECK, new CheckDonationProcessor());
+        processors.put(DonationType.IN_KIND, new InKindDonationProcessor());
+    }
+
+    /** Plugs in the creator for a donation method (replacing any earlier one for that method). */
+    public void addProcessor(DonationProcessor processor) {
+        processors.put(processor.getType(), processor);
+    }
+
+    public DonationProcessor processorFor(DonationType type) {
+        DonationProcessor processor = processors.get(type);
+        if (processor == null) {
+            throw new IllegalArgumentException("No processor for " + type + " donations");
+        }
+        return processor;
+    }
 
     // ---- Donors ----
 
@@ -32,12 +53,13 @@ public class DonationService {
         return donor;
     }
 
-    public Optional<Donor> findDonor(String donorId) {
-        return Optional.ofNullable(donors.get(donorId));
+    /** @return the donor, or null if there is none with that id */
+    public Donor findDonor(String donorId) {
+        return donors.get(donorId);
     }
 
     public List<Donor> listDonors() {
-        return List.copyOf(donors.values());
+        return new ArrayList<>(donors.values());
     }
 
     /** Donors with donations on record cannot be removed: receipts and tax statements depend on them. */
@@ -61,30 +83,35 @@ public class DonationService {
         return campaign;
     }
 
-    public Optional<Campaign> findCampaign(String name) {
-        return Optional.ofNullable(name == null ? null : campaigns.get(key(name)));
+    /** @return the campaign (names compared without regard to case), or null if there is none */
+    public Campaign findCampaign(String name) {
+        if (name == null) {
+            return null;
+        }
+        return campaigns.get(key(name));
     }
 
     public List<Campaign> listCampaigns() {
-        return List.copyOf(campaigns.values());
+        return new ArrayList<>(campaigns.values());
     }
 
     // ---- Recording donations ----
 
     /**
-     * Creates the donation through the factory, adds it to the donor's
-     * history and its campaign, and publishes DONATION_RECEIVED.
+     * Has the creator for this method build and number the donation, then
+     * adds it to its campaign and publishes DONATION_RECEIVED.
      */
     public Donation recordDonation(String donorId, DonationType type, LocalDate date, DonationDetails details) {
         Donor donor = requireDonor(donorId);
         Campaign campaign = null;
         if (details.campaign() != null) {
-            campaign = findCampaign(details.campaign())
-                    .orElseThrow(() -> new IllegalArgumentException("No campaign named " + details.campaign()));
+            campaign = findCampaign(details.campaign());
+            if (campaign == null) {
+                throw new IllegalArgumentException("No campaign named " + details.campaign());
+            }
         }
-        Donation donation = DonationFactory.create(type, donor, date, details);
+        Donation donation = processorFor(type).receive(donor, date, details);
         donations.put(donation.getId(), donation);
-        donor.addDonation(donation);
         if (campaign != null) {
             campaign.addDonation(donation);
         }
@@ -99,41 +126,60 @@ public class DonationService {
         return recordDonation(donorId, DonationType.fromString(typeInput), date, details);
     }
 
-    public Optional<Donation> findDonation(String donationId) {
-        return Optional.ofNullable(donations.get(donationId));
+    /** @return the donation, or null if there is none with that id */
+    public Donation findDonation(String donationId) {
+        return donations.get(donationId);
     }
 
     public List<Donation> listDonations() {
-        return List.copyOf(donations.values());
+        return new ArrayList<>(donations.values());
     }
 
     // ---- Reports ----
 
     public double totalRaised() {
-        return donations.values().stream().mapToDouble(Donation::getValue).sum();
+        double total = 0;
+        for (Donation d : donations.values()) {
+            total += d.getValue();
+        }
+        return total;
     }
 
+    /** Total value per donation method, in the order ONLINE, CHECK, IN_KIND. */
     public Map<DonationType, Double> totalsByType() {
-        Map<DonationType, Double> totals = new EnumMap<>(DonationType.class);
+        Map<DonationType, Double> totals = new LinkedHashMap<>();
         for (DonationType type : DonationType.values()) {
             totals.put(type, 0.0);
         }
-        donations.values().forEach(d -> totals.merge(d.getType(), d.getValue(), Double::sum));
+        for (Donation d : donations.values()) {
+            totals.put(d.getType(), totals.get(d.getType()) + d.getValue());
+        }
         return totals;
     }
 
-    /** Donors ranked by total given, most first. */
+    /** Donors ranked by total given, most first (equal totals keep their registration order). */
     public List<Donor> topDonors(int top) {
-        return donors.values().stream()
-                .sorted(Comparator.comparingDouble(Donor::getTotalGiven).reversed())
-                .limit(top)
-                .toList();
+        List<Donor> ranked = new ArrayList<>();
+        for (Donor donor : donors.values()) {
+            // Insert before the first donor who gave less.
+            int position = ranked.size();
+            for (int i = 0; i < ranked.size(); i++) {
+                if (ranked.get(i).getTotalGiven() < donor.getTotalGiven()) {
+                    position = i;
+                    break;
+                }
+            }
+            ranked.add(position, donor);
+        }
+        return new ArrayList<>(ranked.subList(0, Math.min(top, ranked.size())));
     }
 
     public String summaryReport() {
         StringBuilder sb = new StringBuilder("Donation summary\n");
-        totalsByType().forEach((type, total) ->
-                sb.append(String.format("  %-8s %12s%n", type, DonationDocument.money(total))));
+        Map<DonationType, Double> totals = totalsByType();
+        for (DonationType type : totals.keySet()) {
+            sb.append(String.format("  %-8s %12s%n", type, DonationDocument.money(totals.get(type))));
+        }
         sb.append(String.format("  %-8s %12s", "TOTAL", DonationDocument.money(totalRaised())));
         return sb.toString();
     }

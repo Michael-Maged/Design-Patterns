@@ -23,38 +23,31 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
   }
 }
 
-package "FACTORY: creating donations" as factory #EAF2FB {
-  enum DonationType {
-    ONLINE
-    CHECK
-    IN_KIND
+package "FACTORY METHOD: creating donations" as factory #EAF2FB {
+
+  abstract class DonationProcessor <<Creator>> {
+    -{static} nextId: int
     --
-    +{static} fromString(input: String): DonationType
+    +receive(donor: Donor, date: LocalDate, details: DonationDetails): Donation
+    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, details: DonationDetails): Donation
+    +{abstract} getType(): DonationType
   }
 
-  class DonationFactory <<Factory>> {
-    -{static} NEXT_ID: AtomicInteger
-    --
-    -DonationFactory()
-    +{static} create(type: DonationType, donor: Donor, date: LocalDate, details: DonationDetails): Donation
-    +{static} create(typeInput: String, donor: Donor, date: LocalDate, details: DonationDetails): Donation
+  class OnlineDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
   }
 
-  class DonationDetails {
-    -amount: double
-    -reference: String
-    -bank: String
-    -item: String
-    -recurring: boolean
-    -campaign: String
-    --
-    +{static} of(amount: double): DonationDetails
-    +reference(reference: String): DonationDetails
-    +bank(bank: String): DonationDetails
-    +item(item: String): DonationDetails
-    +recurring(): DonationDetails
-    +campaign(campaign: String): DonationDetails
+  class CheckDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
   }
+
+  class InKindDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
+  }
+
 
   abstract class Donation <<Product>> {
     -id: String
@@ -68,7 +61,7 @@ package "FACTORY: creating donations" as factory #EAF2FB {
     +summary(): String
   }
 
-  class OnlineDonation {
+  class OnlineDonation <<ConcreteProduct>> {
     -paymentReference: String
     -recurringMonthly: boolean
     --
@@ -77,7 +70,7 @@ package "FACTORY: creating donations" as factory #EAF2FB {
     +details(): String
   }
 
-  class CheckDonation {
+  class CheckDonation <<ConcreteProduct>> {
     -checkNumber: String
     -bankName: String
     --
@@ -85,7 +78,7 @@ package "FACTORY: creating donations" as factory #EAF2FB {
     +details(): String
   }
 
-  class InKindDonation {
+  class InKindDonation <<ConcreteProduct>> {
     -itemDescription: String
     --
     +getType(): DonationType
@@ -132,8 +125,32 @@ package "TEMPLATE METHOD: receipts and tax documents" as template #FDF3E7 {
 }
 
 package "Model and service" as service #F3EEF8 {
+  enum DonationType {
+    ONLINE
+    CHECK
+    IN_KIND
+    --
+    +{static} fromString(input: String): DonationType
+  }
+
+  class DonationDetails {
+    -amount: double
+    -reference: String
+    -bank: String
+    -item: String
+    -recurring: boolean
+    -campaign: String
+    --
+    +{static} of(amount: double): DonationDetails
+    +reference(reference: String): DonationDetails
+    +bank(bank: String): DonationDetails
+    +item(item: String): DonationDetails
+    +recurring(): DonationDetails
+    +campaign(campaign: String): DonationDetails
+  }
+
   class Donor {
-    -{static} NEXT_ID: AtomicInteger
+    -{static} nextId: int
     -donations: List<Donation>
     --
     +Donor(name: String, email: String, phone: String, preferredContact: ContactPreference)
@@ -157,16 +174,21 @@ package "Model and service" as service #F3EEF8 {
     -donors: Map<String, Donor>
     -donations: Map<String, Donation>
     -campaigns: Map<String, Campaign>
+    -processors: Map<DonationType, DonationProcessor>
     -bus: EventBus
     --
+    +addProcessor(processor: DonationProcessor): void
+    +processorFor(type: DonationType): DonationProcessor
     +registerDonor(donor: Donor): Donor
-    +findDonor(donorId: String): Optional<Donor>
+    +findDonor(donorId: String): Donor
     +listDonors(): List<Donor>
     +removeDonor(donorId: String): boolean
     +createCampaign(name: String, goal: double): Campaign
+    +findCampaign(name: String): Campaign
     +listCampaigns(): List<Campaign>
     +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails): Donation
     +recordDonation(donorId: String, typeInput: String, date: LocalDate, details: DonationDetails): Donation
+    +findDonation(donationId: String): Donation
     +listDonations(): List<Donation>
     +totalRaised(): double
     +totalsByType(): Map<DonationType, Double>
@@ -180,12 +202,20 @@ package "Model and service" as service #F3EEF8 {
   }
 }
 
-' ---- Factory ----
-DonationFactory ..> DonationType
-DonationFactory ..> DonationDetails : reads
-DonationFactory ..> OnlineDonation : <<creates>>
-DonationFactory ..> CheckDonation : <<creates>>
-DonationFactory ..> InKindDonation : <<creates>>
+' ---- Factory Method: parallel creator and product hierarchies ----
+OnlineDonationProcessor -up-|> DonationProcessor
+CheckDonationProcessor -up-|> DonationProcessor
+InKindDonationProcessor -up-|> DonationProcessor
+DonationProcessor ..> Donation : <<creates>>
+DonationProcessor ..> DonationDetails : reads
+DonationProcessor ..> DonationType
+OnlineDonationProcessor ..> OnlineDonation : <<creates>>
+CheckDonationProcessor ..> CheckDonation : <<creates>>
+InKindDonationProcessor ..> InKindDonation : <<creates>>
+note top of DonationProcessor
+  receive() is final: create (factory method)
+  -> number -> add to donor's history
+end note
 OnlineDonation -up-|> Donation
 CheckDonation -up-|> Donation
 InKindDonation -up-|> Donation
@@ -207,7 +237,10 @@ DonationDemo ..> DonationService
 DonationService "1" o-- "*" Donor
 DonationService "1" o-- "*" Donation
 DonationService "1" o-- "*" Campaign
-DonationService ..> DonationFactory : uses
+DonationService "1" o-- "3" DonationProcessor : processors
 DonationService ..> DonationDocument : <<issues>>
 DonationService ..> EventBus : publishes DONATION_RECEIVED
+
+DonationDocument -[hidden]down- DonationProcessor
+DonationService -[hidden]down- DonationProcessor
 @enduml
