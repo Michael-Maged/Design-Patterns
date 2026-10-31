@@ -1,11 +1,10 @@
 package org.nonprofit.volunteer;
 
 import java.time.LocalDate;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
@@ -30,12 +29,13 @@ public class VolunteerService {
         return volunteer;
     }
 
-    public Optional<Volunteer> findVolunteer(String volunteerId) {
-        return Optional.ofNullable(volunteers.get(volunteerId));
+    /** @return the volunteer, or null if there is none with that id */
+    public Volunteer findVolunteer(String volunteerId) {
+        return volunteers.get(volunteerId);
     }
 
     public List<Volunteer> listVolunteers() {
-        return List.copyOf(volunteers.values());
+        return new ArrayList<>(volunteers.values());
     }
 
     /** Removes a volunteer; their unfinished tasks go back to the pool. */
@@ -59,16 +59,23 @@ public class VolunteerService {
         return task;
     }
 
-    public Optional<Task> findTask(String taskId) {
-        return Optional.ofNullable(tasks.get(taskId));
+    /** @return the task, or null if there is none with that id */
+    public Task findTask(String taskId) {
+        return tasks.get(taskId);
     }
 
     public List<Task> listTasks() {
-        return List.copyOf(tasks.values());
+        return new ArrayList<>(tasks.values());
     }
 
     public List<Task> openTasks() {
-        return tasks.values().stream().filter(t -> !t.isAssigned()).toList();
+        List<Task> open = new ArrayList<>();
+        for (Task task : tasks.values()) {
+            if (!task.isAssigned()) {
+                open.add(task);
+            }
+        }
+        return open;
     }
 
     // ---- Strategy ----
@@ -90,8 +97,8 @@ public class VolunteerService {
 
     // ---- Assignment ----
 
-    /** Who the current strategy would choose, without assigning anyone. */
-    public Optional<Volunteer> suggest(String taskId) {
+    /** Who the current strategy would choose (null if nobody fits), without assigning anyone. */
+    public Volunteer suggest(String taskId) {
         Task task = requireTask(taskId);
         return strategy.pick(task, freeOn(task));
     }
@@ -100,21 +107,21 @@ public class VolunteerService {
      * Assigns the task to the volunteer the current strategy picks and
      * publishes VOLUNTEER_ASSIGNED on the EventBus.
      *
-     * @return the assigned volunteer, or empty if nobody fits
+     * @return the assigned volunteer, or null if nobody fits
      */
-    public Optional<Volunteer> assign(String taskId) {
+    public Volunteer assign(String taskId) {
         Task task = requireTask(taskId);
         if (task.isAssigned()) {
             throw new IllegalStateException(task.getName() + " is already assigned to "
                     + task.getAssignedVolunteer().getName());
         }
-        Optional<Volunteer> chosen = strategy.pick(task, freeOn(task));
-        chosen.ifPresent(volunteer -> {
-            task.setAssignedVolunteer(volunteer);
-            volunteer.assign(task);
+        Volunteer chosen = strategy.pick(task, freeOn(task));
+        if (chosen != null) {
+            task.setAssignedVolunteer(chosen);
+            chosen.assign(task);
             bus.publish(new SystemEvent(SystemEventType.VOLUNTEER_ASSIGNED,
-                    "You are assigned to " + task.getName() + " on " + task.getDay(), volunteer, task));
-        });
+                    "You are assigned to " + task.getName() + " on " + task.getDay(), chosen, task));
+        }
         return chosen;
     }
 
@@ -122,7 +129,7 @@ public class VolunteerService {
     public int assignAllOpen() {
         int filled = 0;
         for (Task task : openTasks()) {
-            if (assign(task.getId()).isPresent()) {
+            if (assign(task.getId()) != null) {
                 filled++;
             }
         }
@@ -143,7 +150,13 @@ public class VolunteerService {
 
     /** One task per day: anyone with an unfinished task that day is not a candidate. */
     private List<Volunteer> freeOn(Task task) {
-        return volunteers.values().stream().filter(v -> !v.isBookedOn(task.getDay())).toList();
+        List<Volunteer> free = new ArrayList<>();
+        for (Volunteer v : volunteers.values()) {
+            if (!v.isBookedOn(task.getDay())) {
+                free.add(v);
+            }
+        }
+        return free;
     }
 
     // ---- Hours ----
@@ -157,19 +170,32 @@ public class VolunteerService {
         if (task.isCompleted()) {
             throw new IllegalStateException("Hours for " + task.getName() + " were already logged");
         }
-        if (hours <= 0) {
-            throw new IllegalArgumentException("Hours must be positive");
+        // NaN ("not a number") would slip past "hours <= 0", so it is checked too.
+        if (Double.isNaN(hours) || hours <= 0) {
+            throw new IllegalArgumentException("Hours must be a positive number");
         }
         task.getAssignedVolunteer().recordHours(new HourEntry(task, hours, date));
         task.markCompleted();
     }
 
-    /** Volunteers ranked by total hours, most first. */
+    /** Volunteers ranked by total hours, most first (equal hours keep their registration order). */
     public List<Volunteer> leaderboard(int top) {
-        return volunteers.values().stream()
-                .sorted(Comparator.comparingDouble(Volunteer::getTotalHours).reversed())
-                .limit(top)
-                .toList();
+        if (top < 0) {
+            throw new IllegalArgumentException("Leaderboard size cannot be negative");
+        }
+        List<Volunteer> ranked = new ArrayList<>();
+        for (Volunteer v : volunteers.values()) {
+            // Insert before the first volunteer with fewer hours.
+            int position = ranked.size();
+            for (int i = 0; i < ranked.size(); i++) {
+                if (ranked.get(i).getTotalHours() < v.getTotalHours()) {
+                    position = i;
+                    break;
+                }
+            }
+            ranked.add(position, v);
+        }
+        return new ArrayList<>(ranked.subList(0, Math.min(top, ranked.size())));
     }
 
     public String leaderboardReport(int top) {

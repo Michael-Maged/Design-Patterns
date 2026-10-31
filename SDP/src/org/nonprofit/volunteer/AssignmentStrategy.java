@@ -1,7 +1,6 @@
 package org.nonprofit.volunteer;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * STRATEGY pattern (strategy interface): one way of choosing which volunteer
@@ -12,9 +11,9 @@ public interface AssignmentStrategy {
 
     /**
      * @param candidates volunteers who are free on the task's day
-     * @return the chosen volunteer, or empty if nobody fits
+     * @return the chosen volunteer, or null if nobody fits
      */
-    Optional<Volunteer> pick(Task task, List<Volunteer> candidates);
+    Volunteer pick(Task task, List<Volunteer> candidates);
 
     /** Short label shown in menus and demo output. */
     String name();
