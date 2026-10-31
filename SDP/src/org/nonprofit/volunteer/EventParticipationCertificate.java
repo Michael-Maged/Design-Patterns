@@ -1,6 +1,7 @@
 package org.nonprofit.volunteer;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,7 +25,7 @@ public class EventParticipationCertificate extends Certificate {
     protected String achievement() {
         StringBuilder sb = new StringBuilder("for volunteering at " + eventName + ":");
         for (HourEntry entry : entriesForEvent()) {
-            sb.append(String.format("%n  - %s (%.1f h)", entry.task().getName(), entry.hours()));
+            sb.append(String.format("%n  - %s (%.1f h)", entry.getTask().getName(), entry.getHours()));
         }
         return sb.toString();
     }
@@ -36,8 +37,12 @@ public class EventParticipationCertificate extends Certificate {
     }
 
     private List<HourEntry> entriesForEvent() {
-        return volunteer.getHourLog().stream()
-                .filter(e -> eventName.equalsIgnoreCase(e.task().getEventName()))
-                .toList();
+        List<HourEntry> result = new ArrayList<>();
+        for (HourEntry entry : volunteer.getHourLog()) {
+            if (eventName.equalsIgnoreCase(entry.getTask().getEventName())) {
+                result.add(entry);
+            }
+        }
+        return result;
     }
 }
