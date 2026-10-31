@@ -8,7 +8,7 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
-| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory, Template Method | `output/donation.puml` | Not started |
+| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory Method, Template Method | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` | Not started |
@@ -27,6 +27,15 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 
 Other features: capacity limits, a **waitlist with automatic promotion** when someone cancels, check-in and attendance reports, ticket revenue, fundraiser pledge progress, and reminders for events starting within a time window. `EventService` is the module's entry point and is what the Facade will call.
 
+## Donations module (Student 1)
+
+| Pattern | Where | What it does |
+|---|---|---|
+| **Factory Method** | `DonationProcessor` (creator), `OnlineDonationProcessor`, `CheckDonationProcessor`, `InKindDonationProcessor` (concrete creators), `Donation` and its three subclasses (products) | `DonationProcessor.receive()` is the same for every donation: create it, give it the next number, add it to the donor's history. The create step is the factory method `createDonation()`, and each concrete creator decides which donation class to build, like the textbook's `PizzaStore`. `DonationService` only depends on the abstract creator and the abstract `Donation`. |
+| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxDeductionStatement` | `DonationDocument.generate()` is final and always prints header, body, totals and footer. A receipt covers one donation; a tax statement lists a donor's donations for one year with money and goods totals. A document with nothing to show (a tax year with no donations) is refused with an `IllegalStateException` instead of being printed. |
+
+Other features: recurring monthly online gifts shown on the receipt (extended requirement 1), **campaign goals with progress** (extended requirement 2), totals by donation method, top donors, receipt numbers with no gaps when a bad donation is rejected, and donor records kept while they have donations. Each donation is published on the `EventBus` as `DONATION_RECEIVED` so the Communication module can thank the donor. `DonationService` is the module's entry point and is what the Facade will call.
+
 ## Volunteers module (Student 2)
 
 | Pattern | Where | What it does |
@@ -44,9 +53,10 @@ From the `SDP` folder:
 javac --release 17 -d bin $(find src -name "*.java")
 java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
+java -cp bin org.nonprofit.donation.DonationDemo
 ```
 
-In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java` or `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` and click **Run**.
+In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**.
 
 ## Diagrams
 

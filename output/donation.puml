@@ -1,0 +1,246 @@
+@startuml donation
+' Donations module (Student 1): class diagram organised by design pattern.
+' Written by hand in the same layout as event.puml; regenerate with the UML generator to refresh.
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 60
+hide circle
+hide empty members
+top to bottom direction
+
+package "org.nonprofit.core (shared)" as core #F5F5F5 {
+  abstract class Person {
+    -id: String
+    -name: String
+    -email: String
+    -phone: String
+    -preferredContact: ContactPreference
+  }
+  class EventBus <<Singleton>> {
+    +{static} getInstance(): EventBus
+    +publish(event: SystemEvent): void
+  }
+}
+
+package "FACTORY METHOD: creating donations" as factory #EAF2FB {
+
+  abstract class DonationProcessor <<Creator>> {
+    -{static} nextId: int
+    --
+    +receive(donor: Donor, date: LocalDate, details: DonationDetails): Donation
+    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, details: DonationDetails): Donation
+    +{abstract} getType(): DonationType
+  }
+
+  class OnlineDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
+  }
+
+  class CheckDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
+  }
+
+  class InKindDonationProcessor <<ConcreteCreator>> {
+    #createDonation(id, donor, date, details): Donation
+    +getType(): DonationType
+  }
+
+
+  abstract class Donation <<Product>> {
+    -id: String
+    -donor: Donor
+    -value: double
+    -date: LocalDate
+    -campaign: String
+    --
+    +{abstract} getType(): DonationType
+    +{abstract} details(): String
+    +summary(): String
+  }
+
+  class OnlineDonation <<ConcreteProduct>> {
+    -paymentReference: String
+    -recurringMonthly: boolean
+    --
+    +getType(): DonationType
+    +isRecurringMonthly(): boolean
+    +details(): String
+  }
+
+  class CheckDonation <<ConcreteProduct>> {
+    -checkNumber: String
+    -bankName: String
+    --
+    +getType(): DonationType
+    +details(): String
+  }
+
+  class InKindDonation <<ConcreteProduct>> {
+    -itemDescription: String
+    --
+    +getType(): DonationType
+    +details(): String
+  }
+}
+
+package "TEMPLATE METHOD: receipts and tax documents" as template #FDF3E7 {
+  abstract class DonationDocument <<AbstractClass>> {
+    ~{static} ORGANIZATION: String
+    #issueDate: LocalDate
+    --
+    +generate(): String
+    .. steps ..
+    #{abstract} title(): String
+    #{abstract} body(): String
+    #{abstract} totals(): String
+    .. hooks ..
+    #hasContent(): boolean
+    #header(): String
+    #footer(): String
+  }
+
+  class DonationReceipt {
+    -donation: Donation
+    --
+    +DonationReceipt(donation: Donation, issueDate: LocalDate)
+    #title(): String
+    #body(): String
+    #totals(): String
+    #footer(): String
+  }
+
+  class TaxDeductionStatement {
+    -donor: Donor
+    -year: int
+    --
+    +TaxDeductionStatement(donor: Donor, year: int, issueDate: LocalDate)
+    #title(): String
+    #body(): String
+    #totals(): String
+    #hasContent(): boolean
+  }
+}
+
+package "Model and service" as service #F3EEF8 {
+  enum DonationType {
+    ONLINE
+    CHECK
+    IN_KIND
+    --
+    +{static} fromString(input: String): DonationType
+  }
+
+  class DonationDetails {
+    -amount: double
+    -reference: String
+    -bank: String
+    -item: String
+    -recurring: boolean
+    -campaign: String
+    --
+    +{static} of(amount: double): DonationDetails
+    +reference(reference: String): DonationDetails
+    +bank(bank: String): DonationDetails
+    +item(item: String): DonationDetails
+    +recurring(): DonationDetails
+    +campaign(campaign: String): DonationDetails
+  }
+
+  class Donor {
+    -{static} nextId: int
+    -donations: List<Donation>
+    --
+    +Donor(name: String, email: String, phone: String, preferredContact: ContactPreference)
+    +Donor(name: String, email: String, phone: String)
+    +getDonations(): List<Donation>
+    +donationsIn(year: int): List<Donation>
+    +getTotalGiven(): double
+    +summary(): String
+  }
+
+  class Campaign {
+    -name: String
+    -goal: double
+    -raised: double
+    --
+    +progressPercent(): double
+    +summary(): String
+  }
+
+  class DonationService {
+    -donors: Map<String, Donor>
+    -donations: Map<String, Donation>
+    -campaigns: Map<String, Campaign>
+    -processors: Map<DonationType, DonationProcessor>
+    -bus: EventBus
+    --
+    +addProcessor(processor: DonationProcessor): void
+    +processorFor(type: DonationType): DonationProcessor
+    +registerDonor(donor: Donor): Donor
+    +findDonor(donorId: String): Donor
+    +listDonors(): List<Donor>
+    +removeDonor(donorId: String): boolean
+    +createCampaign(name: String, goal: double): Campaign
+    +findCampaign(name: String): Campaign
+    +listCampaigns(): List<Campaign>
+    +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails): Donation
+    +recordDonation(donorId: String, typeInput: String, date: LocalDate, details: DonationDetails): Donation
+    +findDonation(donationId: String): Donation
+    +listDonations(): List<Donation>
+    +totalRaised(): double
+    +totalsByType(): Map<DonationType, Double>
+    +topDonors(top: int): List<Donor>
+    +receipt(donationId: String, issueDate: LocalDate): String
+    +taxStatement(donorId: String, year: int, issueDate: LocalDate): String
+  }
+
+  class DonationDemo {
+    +{static} main(args: String[]): void
+  }
+}
+
+' ---- Factory Method: parallel creator and product hierarchies ----
+OnlineDonationProcessor -up-|> DonationProcessor
+CheckDonationProcessor -up-|> DonationProcessor
+InKindDonationProcessor -up-|> DonationProcessor
+DonationProcessor ..> Donation : <<creates>>
+DonationProcessor ..> DonationDetails : reads
+DonationProcessor ..> DonationType
+OnlineDonationProcessor ..> OnlineDonation : <<creates>>
+CheckDonationProcessor ..> CheckDonation : <<creates>>
+InKindDonationProcessor ..> InKindDonation : <<creates>>
+note top of DonationProcessor
+  receive() is final: create (factory method)
+  -> number -> add to donor's history
+end note
+OnlineDonation -up-|> Donation
+CheckDonation -up-|> Donation
+InKindDonation -up-|> Donation
+
+' ---- Template Method ----
+DonationReceipt -up-|> DonationDocument
+TaxDeductionStatement -up-|> DonationDocument
+DonationReceipt --> "1" Donation
+TaxDeductionStatement --> "1" Donor
+note bottom of DonationDocument
+  generate() is final:
+  header -> body -> totals -> footer
+end note
+
+' ---- Model and service ----
+Donor -up-|> Person
+Donor "1" <--> "*" Donation : donations / donor
+DonationDemo ..> DonationService
+DonationService "1" o-- "*" Donor
+DonationService "1" o-- "*" Donation
+DonationService "1" o-- "*" Campaign
+DonationService "1" o-- "3" DonationProcessor : processors
+DonationService ..> DonationDocument : <<issues>>
+DonationService ..> EventBus : publishes DONATION_RECEIVED
+
+DonationDocument -[hidden]down- DonationProcessor
+DonationService -[hidden]down- DonationProcessor
+@enduml
