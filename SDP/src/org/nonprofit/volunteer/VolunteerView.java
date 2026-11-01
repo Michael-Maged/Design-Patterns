@@ -46,14 +46,16 @@ public class VolunteerView implements SystemObserver {
         out.println(" 4. Remove a volunteer");
         out.println(" 5. Add a task");
         out.println(" 6. List tasks");
-        out.println(" 7. Change the assignment rule");
-        out.println(" 8. Suggest a volunteer for a task");
-        out.println(" 9. Assign a task");
-        out.println("10. Assign all open tasks");
-        out.println("11. Log hours for a task");
-        out.println("12. Show the leaderboard");
-        out.println("13. Issue an hours certificate");
-        out.println("14. Issue an event participation certificate");
+        out.println(" 7. Remove a task");
+        out.println(" 8. Change the assignment rule");
+        out.println(" 9. Suggest a volunteer for a task");
+        out.println("10. Assign a task");
+        out.println("11. Assign all open tasks");
+        out.println("12. Unassign a task");
+        out.println("13. Log hours for a task");
+        out.println("14. Show the leaderboard");
+        out.println("15. Issue an hours certificate");
+        out.println("16. Issue an event participation certificate");
         out.println(" 0. Exit");
         return askNumber("Choose");
     }
