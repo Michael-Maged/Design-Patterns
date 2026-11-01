@@ -42,6 +42,7 @@ Other features: recurring monthly online gifts shown on the receipt (extended re
 |---|---|---|
 | **Strategy** | `AssignmentStrategy`, `SkillBasedAssignment`, `AvailabilityBasedAssignment`, `PreferenceBasedAssignment`, `AssignmentMode` | `VolunteerService` holds one strategy that picks who gets a task. It can be swapped at runtime (or chosen from user input such as `"preference"`), so the same task can go to a different volunteer. |
 | **Template Method** | `Certificate`, `HoursCertificate`, `EventParticipationCertificate` | `Certificate.issue()` is final and always prints title, recipient, achievement and signature. Subclasses supply only the title and achievement, and can override the `isEligible()` hook. |
+| **MVC** | `VolunteerView` (view), `VolunteerController` (controller), `VolunteerService` and the classes it manages (model), `VolunteerApp` (starts it) | A console screen for the module. The view only prints menus and reads input; the controller turns each menu choice into calls on the model and tells the view what to show. The view also observes the `EventBus`, so it shows a notification when the model assigns a task. |
 
 Other features: volunteer profiles (skills, available days, preferred task categories), one task per volunteer per day, hour logging, a **leaderboard by hours** (extended requirement 4), suggestions without assigning, and freeing a removed volunteer's open tasks. Assignments are published on the `EventBus` as `VOLUNTEER_ASSIGNED` for the Communication module. `VolunteerService` is the module's entry point and is what the Facade will call.
 
@@ -53,10 +54,11 @@ From the `SDP` folder:
 javac --release 17 -d bin $(find src -name "*.java")
 java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
+java -cp bin org.nonprofit.volunteer.VolunteerApp
 java -cp bin org.nonprofit.donation.DonationDemo
 ```
 
-In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**.
+In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` opens the interactive Volunteers screen; the `...Demo` classes run a fixed walkthrough.
 
 ## Diagrams
 
