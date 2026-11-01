@@ -53,8 +53,11 @@ package "MVC: Volunteers screen" as mvc #FFF8E1 {
     -registerVolunteer(): void
     -updateProfile(): void
     -addTask(): void
+    -removeTask(): void
     -changeRule(): void
+    -suggest(): void
     -assign(): void
+    -unassign(): void
     -logHours(): void
     -hoursCertificate(): void
   }
@@ -208,6 +211,7 @@ package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
     +addTask(task: Task): Task
     +findTask(taskId: String): Task
     +listTasks(): List<Task>
+    +removeTask(taskId: String): void
     +openTasks(): List<Task>
     +setStrategy(strategy: AssignmentStrategy): void
     +setStrategy(mode: AssignmentMode): void

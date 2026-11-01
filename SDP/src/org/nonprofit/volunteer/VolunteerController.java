@@ -40,14 +40,16 @@ public class VolunteerController {
                     case 4: removeVolunteer(); break;
                     case 5: addTask(); break;
                     case 6: view.showTasks(service.listTasks()); break;
-                    case 7: changeRule(); break;
-                    case 8: suggest(); break;
-                    case 9: assign(); break;
-                    case 10: assignAll(); break;
-                    case 11: logHours(); break;
-                    case 12: view.showText(service.leaderboardReport(5)); break;
-                    case 13: hoursCertificate(); break;
-                    case 14: participationCertificate(); break;
+                    case 7: removeTask(); break;
+                    case 8: changeRule(); break;
+                    case 9: suggest(); break;
+                    case 10: assign(); break;
+                    case 11: assignAll(); break;
+                    case 12: unassign(); break;
+                    case 13: logHours(); break;
+                    case 14: view.showText(service.leaderboardReport(5)); break;
+                    case 15: hoursCertificate(); break;
+                    case 16: participationCertificate(); break;
                     case 0: running = false; break;
                     default: view.showError("Please choose a number from the menu.");
                 }
@@ -128,6 +130,12 @@ public class VolunteerController {
         view.showMessage("Added " + task.summary());
     }
 
+    private void removeTask() {
+        Task task = requireTask(view.ask("Task id to remove"));
+        service.removeTask(task.getId());
+        view.showMessage("Removed " + task.getName() + ".");
+    }
+
     private void changeRule() {
         int choice = view.showRuleMenu();
         switch (choice) {
@@ -143,6 +151,10 @@ public class VolunteerController {
 
     private void suggest() {
         Task task = requireTask(view.ask("Task id (e.g. TSK-1)"));
+        if (task.isAssigned()) {
+            view.showMessage(task.getName() + " is already assigned to " + task.getAssignedVolunteer().getName() + ".");
+            return;
+        }
         Volunteer volunteer = service.suggest(task.getId());
         if (volunteer == null) {
             view.showMessage("Nobody fits " + task.getName() + " with the current rule.");
@@ -159,6 +171,17 @@ public class VolunteerController {
         } else {
             view.showMessage(task.getName() + " assigned to " + volunteer.getName() + ".");
         }
+    }
+
+    private void unassign() {
+        Task task = requireTask(view.ask("Task id to unassign"));
+        Volunteer volunteer = task.getAssignedVolunteer();
+        if (volunteer == null) {
+            view.showMessage(task.getName() + " has no volunteer.");
+            return;
+        }
+        service.unassign(task.getId());
+        view.showMessage(volunteer.getName() + " is no longer assigned to " + task.getName() + ".");
     }
 
     private void assignAll() {
