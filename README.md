@@ -12,7 +12,7 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` | Not started |
-| 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator | `output/communication.puml` | Not started |
+| 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer | [`output/communication.puml`](output/communication.puml) | **Done** |
 | 6 | _TBD_ | `org.nonprofit.core` + `App` | Data store, event bus, system facade, console menu, overall diagram, requirements doc | Singleton, Observer, Facade | [`output/core.puml`](output/core.puml), `output/overall.puml` | Foundation in place* |
 
 \* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`.
@@ -45,6 +45,16 @@ Other features: recurring monthly online gifts shown on the receipt (extended re
 
 Other features: volunteer profiles (skills, available days, preferred task categories), one task per volunteer per day, hour logging, a **leaderboard by hours** (extended requirement 4), suggestions without assigning, and freeing a removed volunteer's open tasks. Assignments are published on the `EventBus` as `VOLUNTEER_ASSIGNED` for the Communication module. `VolunteerService` is the module's entry point and is what the Facade will call.
 
+## Communication module (Student 5)
+
+| Pattern | Where | What it does |
+|---|---|---|
+| **Strategy** | `CommunicationChannel`, `EmailChannel`, `SmsChannel`, `SocialMediaChannel`, `ChannelSelector` | Each message is sent through a channel picked per recipient from their preferred contact (falling back to one they have details for). A caller can force one channel for a whole broadcast. |
+| **Decorator** | `MessageContent`, `PlainContent`, `ContentDecorator`, `UrgentTagDecorator`, `SignatureDecorator`, `FooterDecorator` | The text is built by stacking an urgent tag, a signature and an unsubscribe footer (e-mail only) around the plain text. |
+| **Observer** | `CommunicationService` | Subscribes to every `EventBus` topic and turns donations, assignments, registrations and event changes into messages. A system event with no recipient is sent to every person in its source's `Audience` (`Event` implements it), so Communication never depends on the Events package. |
+
+Other features: SMS cut to 160 characters, a communication log (`getLog()`), and `broadcast(...)` for manual sends.
+
 ## Running
 
 From the `SDP` folder:
@@ -54,6 +64,7 @@ javac --release 17 -d bin $(find src -name "*.java")
 java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
 java -cp bin org.nonprofit.donation.DonationDemo
+java -cp bin org.nonprofit.communication.CommunicationDemo
 ```
 
 In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**.

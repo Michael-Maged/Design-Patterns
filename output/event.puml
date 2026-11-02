@@ -26,6 +26,9 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
     +{static} getInstance(): EventBus
     +publish(event: SystemEvent): void
   }
+  interface Audience {
+    +getAudience(): List<Person>
+  }
 }
 
 package "FACTORY: creating events" as factory #EAF2FB {
@@ -112,6 +115,7 @@ package "OBSERVER: notifying about event changes" as observer #EEF7EE {
     ~markCheckedIn(attendee: Attendee): void
     .. queries ..
     +getAttendees(): List<Attendee>
+    +getAudience(): List<Attendee>
     +getWaitlist(): List<Attendee>
     +getCheckedIn(): Set<Attendee>
     +summary(): String
@@ -260,6 +264,7 @@ Attendee .up.|> EventObserver
 EventBusNotifier .up.|> EventObserver
 Attendee -up-|> Person
 EventBusNotifier ..> EventBus : publishes
+Event .up.|> Audience : lets Communication reach attendees
 
 ' ---- Decorator ----
 BasicTicket .up.|> Ticket
