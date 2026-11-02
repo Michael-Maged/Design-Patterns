@@ -94,8 +94,10 @@ Each student also generates their package's diagram into `output/` with the UML 
 ### Communication (Student 5)
 - `Message` (subject, body, recipient).
 - **Strategy**: `CommunicationChannel` interface `send(Message)`. Implementations: `EmailChannel`, `SmsChannel`, `SocialMediaChannel` (posts to simulated Facebook/X/Instagram). A `ChannelSelector` picks a strategy from the recipient's preferred contact (donors default to email, volunteers to SMS, public outreach to social media).
-- **Decorator**: `MessageContent` interface `render()`. `PlainContent` is the concrete component, with decorators `SignatureDecorator`, `UrgentTagDecorator` and `FooterDecorator` (unsubscribe/legal footer). Logging is done by `LoggingChannel`, which wraps a channel.
-- `CommunicationService` implements `SystemObserver`. It subscribes to the `EventBus` events and turns them into messages (thank-you for donations, event updates/reminders, assignment notices). It also exposes `broadcast(...)` for manual sends and keeps a sent-message log.
+- **Decorator**: `MessageContent` interface `render()`. `PlainContent` is the concrete component, with decorators `SignatureDecorator`, `UrgentTagDecorator` and `FooterDecorator` (unsubscribe/legal footer). (As built there is no `LoggingChannel`; `CommunicationService` keeps the log itself as `SentMessage` entries.) The footer is added on e-mail only, the signature on e-mail and social media, and the urgent tag on urgent-need and cancellation messages.
+- `CommunicationService` implements `SystemObserver`. It subscribes to the `EventBus` events and turns them into messages (thank-you for donations, event updates/reminders, assignment notices). It also exposes `broadcast(...)` for manual sends, can force one channel for a whole broadcast, and keeps a sent-message log (`getLog()`).
+- **Audience (core)**: some bus events (event updates, reminders, cancellations) have no single recipient. Their source implements `org.nonprofit.core.Audience` (`Event` does), and Communication sends to everyone in `getAudience()`. This keeps Communication from importing the event package.
+- `ChannelSelector` falls back to another channel when the recipient has no address for the preferred one.
 
 ## Repository output
 
