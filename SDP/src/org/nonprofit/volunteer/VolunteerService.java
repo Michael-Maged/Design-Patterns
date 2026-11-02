@@ -68,6 +68,19 @@ public class VolunteerService {
         return new ArrayList<>(tasks.values());
     }
 
+    /**
+     * Deletes a task that has not been done yet; its volunteer is freed.
+     * Completed tasks stay, because logged hours and certificates refer to them.
+     */
+    public void removeTask(String taskId) {
+        Task task = requireTask(taskId);
+        if (task.isCompleted()) {
+            throw new IllegalStateException(task.getName() + " is completed and its hours are on record, so it cannot be removed");
+        }
+        unassign(taskId);
+        tasks.remove(taskId);
+    }
+
     public List<Task> openTasks() {
         List<Task> open = new ArrayList<>();
         for (Task task : tasks.values()) {
