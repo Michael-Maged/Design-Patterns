@@ -1,0 +1,160 @@
+@startuml communication
+' Communication module (Student 5): class diagram organised by design pattern.
+' Written by hand from the source in org.nonprofit.communication (the UML generator was not available).
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide circle
+hide empty members
+top to bottom direction
+
+package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
+  class CommunicationService <<Observer>> {
+    -organisation: String
+    -selector: ChannelSelector
+    -log: List<SentMessage>
+    --
+    +CommunicationService(organisation: String)
+    +onEvent(event: SystemEvent): void
+    +broadcast(recipients: Collection<Person>, subject: String, text: String, urgent: boolean): int
+    +broadcast(recipients, subject, text, urgent, forced: ContactPreference): int
+    +send(recipient: Person, subject: String, text: String, urgent: boolean, forced: ContactPreference): boolean
+    ~compose(text: String, urgent: boolean, channel: CommunicationChannel): String
+    +getLog(): List<SentMessage>
+  }
+
+  class SentMessage {
+    -time: LocalDateTime
+    -channel: String
+    -recipient: String
+    -subject: String
+    --
+    +toString(): String
+  }
+}
+
+package "STRATEGY: how a message is delivered" as strategy #EEF3FB {
+  interface CommunicationChannel <<Strategy>> {
+    +send(message: Message): void
+    +name(): String
+  }
+
+  class EmailChannel {
+    +send(message: Message): void
+    +name(): String
+  }
+
+  class SmsChannel {
+    ~{static} MAX_LENGTH: int = 160
+    +send(message: Message): void
+    +name(): String
+  }
+
+  class SocialMediaChannel {
+    -platform: String
+    --
+    +SocialMediaChannel(platform: String)
+    +send(message: Message): void
+    +name(): String
+  }
+
+  class ChannelSelector {
+    -email: CommunicationChannel
+    -sms: CommunicationChannel
+    -social: CommunicationChannel
+    --
+    +channelFor(preference: ContactPreference): CommunicationChannel
+    +channelFor(person: Person): CommunicationChannel
+  }
+
+  class Message {
+    -recipient: Person
+    -subject: String
+    -body: String
+    --
+    +Message(recipient: Person, subject: String, body: String)
+  }
+}
+
+package "DECORATOR: how the text is built" as decorator #FDF6E7 {
+  interface MessageContent <<Component>> {
+    +render(): String
+  }
+
+  class PlainContent {
+    -text: String
+    --
+    +render(): String
+  }
+
+  abstract class ContentDecorator <<Decorator>> {
+    #wrapped: MessageContent
+    --
+    #ContentDecorator(wrapped: MessageContent)
+    +render(): String
+  }
+
+  class UrgentTagDecorator {
+    +render(): String
+  }
+
+  class SignatureDecorator {
+    -organisation: String
+    +render(): String
+  }
+
+  class FooterDecorator {
+    ~{static} FOOTER: String
+    +render(): String
+  }
+}
+
+package "From core (see core.puml)" as core #F5F5F5 {
+  interface SystemObserver
+  class EventBus <<Singleton>>
+  class SystemEvent
+  interface Audience {
+    +getAudience(): List<Person>
+  }
+  abstract class Person
+  enum ContactPreference
+}
+
+hide core members
+core -[hidden]down- strategy
+
+CommunicationService ..|> SystemObserver
+CommunicationService --> EventBus : subscribes to every topic
+CommunicationService ..> SystemEvent : onEvent
+CommunicationService ..> Audience : fans out when recipient is null
+CommunicationService "1" --> "1" ChannelSelector
+CommunicationService "1" o-- "*" SentMessage : log
+CommunicationService ..> MessageContent : compose()
+CommunicationService ..> Message : creates
+
+CommunicationChannel <|.. EmailChannel
+CommunicationChannel <|.. SmsChannel
+CommunicationChannel <|.. SocialMediaChannel
+CommunicationChannel ..> Message : send
+ChannelSelector ..> CommunicationChannel : chooses
+ChannelSelector ..> Person : preferred contact
+ChannelSelector ..> ContactPreference
+Message --> Person : recipient
+
+MessageContent <|.. PlainContent
+MessageContent <|.. ContentDecorator
+ContentDecorator <|-- UrgentTagDecorator
+ContentDecorator <|-- SignatureDecorator
+ContentDecorator <|-- FooterDecorator
+ContentDecorator --> "1" MessageContent : wrapped
+
+note right of ChannelSelector
+  Picks the channel from the person's
+  preferred contact; falls back to one
+  they have details for.
+end note
+
+note bottom of ContentDecorator
+  Stacks, e.g.
+  Footer(Signature(Urgent(Plain)))
+end note
+@enduml
