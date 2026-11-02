@@ -77,7 +77,14 @@ package "Shared people model" as people #F5F5F5 {
   }
 }
 
+interface Audience {
+  +getAudience(): List<Person>
+}
+
 hub -[hidden]down- people
+
+Audience ..> Person
+SystemEvent ..> Audience : source may be one
 
 EventBus --> "1" EventBus : instance
 EventBus "1" o-- "*" SystemObserver : subscribers
