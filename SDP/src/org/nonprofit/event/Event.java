@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.nonprofit.core.Audience;
+
 /**
  * Base class for all events.
  *
@@ -21,7 +23,7 @@ import java.util.Set;
  *
  * Concrete types are created only through {@link EventFactory}.
  */
-public abstract class Event {
+public abstract class Event implements Audience {
     static final DateTimeFormatter DISPLAY_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final String id;
@@ -158,6 +160,12 @@ public abstract class Event {
 
     public List<Attendee> getAttendees() {
         return List.copyOf(registrations.keySet());
+    }
+
+    /** Lets Communication reach every registered attendee without knowing this class. */
+    @Override
+    public List<Attendee> getAudience() {
+        return getAttendees();
     }
 
     public Ticket getTicket(Attendee attendee) {
