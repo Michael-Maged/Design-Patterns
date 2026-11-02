@@ -17,53 +17,9 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
     -phone: String
     -preferredContact: ContactPreference
   }
-  interface SystemObserver <<Observer>> {
-    +onEvent(event: SystemEvent): void
-  }
   class EventBus <<Singleton>> {
     +{static} getInstance(): EventBus
     +publish(event: SystemEvent): void
-  }
-}
-
-package "MVC: Volunteers screen" as mvc #FFF8E1 {
-  class VolunteerView <<View>> {
-    -in: Scanner
-    -out: PrintStream
-    --
-    +showMenu(currentRule: String): int
-    +showProfileMenu(): int
-    +showRuleMenu(): int
-    +ask(prompt: String): String
-    +askNumber(prompt: String): int
-    +showVolunteers(volunteers: List<Volunteer>): void
-    +showTasks(tasks: List<Task>): void
-    +showText(text: String): void
-    +showMessage(message: String): void
-    +showError(message: String): void
-    +onEvent(event: SystemEvent): void
-  }
-
-  class VolunteerController <<Controller>> {
-    -service: VolunteerService
-    -view: VolunteerView
-    --
-    +VolunteerController(service: VolunteerService, view: VolunteerView)
-    +run(): void
-    -registerVolunteer(): void
-    -updateProfile(): void
-    -addTask(): void
-    -removeTask(): void
-    -changeRule(): void
-    -suggest(): void
-    -assign(): void
-    -unassign(): void
-    -logHours(): void
-    -hoursCertificate(): void
-  }
-
-  class VolunteerApp {
-    +{static} main(args: String[]): void
   }
 }
 
@@ -211,7 +167,6 @@ package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
     +addTask(task: Task): Task
     +findTask(taskId: String): Task
     +listTasks(): List<Task>
-    +removeTask(taskId: String): void
     +openTasks(): List<Task>
     +setStrategy(strategy: AssignmentStrategy): void
     +setStrategy(mode: AssignmentMode): void
@@ -255,14 +210,6 @@ end note
 HoursCertificate -up-|> Certificate
 EventParticipationCertificate -up-|> Certificate
 Certificate --> Volunteer
-
-' ---- MVC ----
-VolunteerApp ..> VolunteerController : <<creates>>
-VolunteerController --> "1" VolunteerView : view
-VolunteerController --> "1" VolunteerService : model
-VolunteerView .up.|> SystemObserver
-EventBus ..> SystemObserver : notifies
-VolunteerController ..> AssignmentMode
 
 ' ---- Service ----
 VolunteerDemo ..> VolunteerService
