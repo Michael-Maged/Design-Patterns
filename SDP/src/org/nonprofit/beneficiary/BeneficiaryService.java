@@ -162,8 +162,11 @@ public class BeneficiaryService {
      */
     public List<Distribution> distribute(String program, String category, int available, LocalDate date) {
         String programName = requireProgram(program);
+        requireDate(date);
+        Map<Need, Integer> shares = preview(category, available);
+        checkShares(shares, available);
         List<Distribution> made = new ArrayList<>();
-        for (Map.Entry<Need, Integer> share : preview(category, available).entrySet()) {
+        for (Map.Entry<Need, Integer> share : shares.entrySet()) {
             made.add(record(share.getKey(), share.getValue(), programName, date));
         }
         return made;
@@ -171,7 +174,28 @@ public class BeneficiaryService {
 
     /** Hands units straight to one need, e.g. a service such as counselling sessions. */
     public Distribution giveDirectly(String needId, int units, String program, LocalDate date) {
-        return record(requireNeed(needId), units, requireProgram(program), date);
+        return record(requireNeed(needId), units, requireProgram(program), requireDate(date));
+    }
+
+    /**
+     * Checks a strategy's answer before anything is handed out, so a faulty
+     * strategy cannot leave a distribution half done.
+     */
+    private static void checkShares(Map<Need, Integer> shares, int available) {
+        int total = 0;
+        for (Map.Entry<Need, Integer> share : shares.entrySet()) {
+            Need need = share.getKey();
+            int units = share.getValue();
+            if (units <= 0 || units > need.remaining()) {
+                throw new IllegalStateException("Strategy gave " + units + " unit(s) to " + need.getId()
+                        + ", which needs " + need.remaining());
+            }
+            total += units;
+        }
+        if (total > available) {
+            throw new IllegalStateException("Strategy handed out " + total + " unit(s) but only "
+                    + available + " are available");
+        }
     }
 
     private Distribution record(Need need, int units, String program, LocalDate date) {
@@ -232,6 +256,13 @@ public class BeneficiaryService {
             throw new IllegalArgumentException("No need with id " + needId);
         }
         return need;
+    }
+
+    private static LocalDate requireDate(LocalDate date) {
+        if (date == null) {
+            throw new IllegalArgumentException("Distribution date is required");
+        }
+        return date;
     }
 
     private static String requireProgram(String program) {

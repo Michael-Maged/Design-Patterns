@@ -39,6 +39,10 @@ public class ProgramImpactReport extends ImpactReport {
 
     @Override
     protected void collectData() {
+        // Start empty so generating the same report twice does not count anything twice.
+        distributions.clear();
+        reached.clear();
+        needsServed.clear();
         for (Distribution d : allDistributions) {
             if (d.getProgram().equalsIgnoreCase(program)) {
                 distributions.add(d);
