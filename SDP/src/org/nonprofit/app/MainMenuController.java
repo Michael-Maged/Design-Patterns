@@ -21,12 +21,7 @@ import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.communication.SentMessage;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.Person;
-import org.nonprofit.donation.Campaign;
-import org.nonprofit.donation.Donation;
-import org.nonprofit.donation.DonationDetails;
-import org.nonprofit.donation.DonationService;
-import org.nonprofit.donation.DonationType;
-import org.nonprofit.donation.Donor;
+import org.nonprofit.donation.DonationController;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.event.Event;
 import org.nonprofit.event.EventService;
@@ -46,31 +41,33 @@ import org.nonprofit.volunteer.VolunteerController;
  * and any new notes in the attendees' inboxes; the model classes keep that
  * text and never print it themselves.
  *
- * IDs can be typed in any case ("ben-1" finds BEN-1). The Volunteers option
- * opens the module's own MVC screen ({@link VolunteerController}), which
- * works on the shared VolunteerService.
+ * IDs can be typed in any case ("ben-1" finds BEN-1). The Donations and
+ * Volunteers options open each module's own MVC screen
+ * ({@link DonationController}, {@link VolunteerController}), which work on the
+ * shared DonationService and VolunteerService.
  */
 public class MainMenuController {
     private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final DataStore store;
-    private final DonationService donations;
     private final EventService events;
     private final BeneficiaryService beneficiaries;
     private final CommunicationService communication;
     private final MainMenuView view;
+    private final DonationController donationScreen;
     private final VolunteerController volunteerScreen;
 
-    public MainMenuController(DataStore store, MainMenuView view, VolunteerController volunteerScreen) {
-        if (store == null || view == null || volunteerScreen == null) {
-            throw new IllegalArgumentException("Data store, view and volunteer screen are required");
+    public MainMenuController(DataStore store, MainMenuView view, DonationController donationScreen,
+            VolunteerController volunteerScreen) {
+        if (store == null || view == null || donationScreen == null || volunteerScreen == null) {
+            throw new IllegalArgumentException("Data store, view, donation screen and volunteer screen are required");
         }
         this.store = store;
-        this.donations = store.getDonationService();
         this.events = store.getEventService();
         this.beneficiaries = store.getBeneficiaryService();
         this.communication = store.getCommunicationService();
         this.view = view;
+        this.donationScreen = donationScreen;
         this.volunteerScreen = volunteerScreen;
     }
 
@@ -79,7 +76,7 @@ public class MainMenuController {
         boolean running = true;
         while (running) {
             switch (view.showMainMenu()) {
-                case 1: donations(); break;
+                case 1: donationScreen.run(); break;
                 case 2: volunteerScreen.run(); break;
                 case 3: events(); break;
                 case 4: beneficiaries(); break;
@@ -97,131 +94,6 @@ public class MainMenuController {
         for (Attendee attendee : store.listAttendees()) {
             view.showInbox(attendee.getName(), attendee.takeNewNotes());
         }
-    }
-
-    // ---- Donations ----
-
-    private void donations() {
-        boolean open = true;
-        while (open) {
-            int choice = view.showDonationMenu();
-            try {
-                switch (choice) {
-                    case 1: view.showList(lines(donations.listDonors(), Donor::summary), "No donors yet."); break;
-                    case 2: registerDonor(); break;
-                    case 3: updateDonor(); break;
-                    case 4: removeDonor(); break;
-                    case 5: donationHistory(); break;
-                    case 6: recordDonation(); break;
-                    case 7: view.showList(lines(donations.listDonations(), Donation::summary), "No donations yet."); break;
-                    case 8: view.showText(donations.receipt(askId("Donation id (e.g. DNT-1)"), LocalDate.now())); break;
-                    case 9: taxStatement(); break;
-                    case 10: createCampaign(); break;
-                    case 11: view.showList(lines(donations.listCampaigns(), Campaign::summary), "No campaigns yet."); break;
-                    case 12: donationTotals(); break;
-                    case 0: open = false; break;
-                    default: view.showError("Please choose a number from the menu.");
-                }
-            } catch (IllegalArgumentException | IllegalStateException e) {
-                view.showError(e.getMessage());
-            }
-            showNewMessages();
-        }
-    }
-
-    private void registerDonor() {
-        String name = view.ask("Name");
-        String email = optional(view.ask("E-mail"));
-        String phone = optional(view.ask("Phone"));
-        ContactPreference contact = parseContact(view.ask("Contact by (email / sms / social) [email]"),
-                ContactPreference.EMAIL);
-        Donor donor = donations.registerDonor(new Donor(name, email, phone, contact));
-        view.showMessage("Registered " + donor.summary());
-    }
-
-    private void updateDonor() {
-        Donor donor = requireDonor(askId("Donor id (e.g. DNR-1)"));
-        String[] contact = askContactChanges(donor);
-        Donor updated = donations.updateDonor(donor.getId(), contact[0], contact[1], contact[2],
-                parseContact(contact[3], donor.getPreferredContact()));
-        view.showMessage("Updated " + updated.summary());
-    }
-
-    private void removeDonor() {
-        String donorId = askId("Donor id to remove");
-        donations.removeDonor(donorId);
-        view.showMessage("Removed " + donorId + ".");
-    }
-
-    private void donationHistory() {
-        Donor donor = requireDonor(askId("Donor id"));
-        view.showMessage(donor.summary());
-        view.showList(lines(donor.getDonations(), Donation::summary), "No donations yet.");
-    }
-
-    private void recordDonation() {
-        String donorId = requireDonor(askId("Donor id (e.g. DNR-1)")).getId();
-        String typeText = view.ask("Type (online / check / in-kind)");
-        // Parsed here only to know which questions to ask; the service parses it again for the factory method.
-        DonationType type = DonationType.fromString(typeText);
-        DonationDetails details = DonationDetails.of(parseDouble(view.ask(
-                type == DonationType.IN_KIND ? "Estimated value" : "Amount"), "Amount"));
-        switch (type) {
-            case ONLINE:
-                details.reference(view.ask("Payment reference"));
-                if (parseYesNo(view.ask("Monthly recurring gift? (y/n) [n]"))) {
-                    details.recurring();
-                }
-                break;
-            case CHECK:
-                details.reference(view.ask("Check number")).bank(view.ask("Bank"));
-                break;
-            default:
-                details.item(view.ask("Item description"));
-        }
-        String campaign = optional(view.ask("Campaign (leave empty if none)"));
-        if (campaign != null) {
-            details.campaign(campaign);
-        }
-        LocalDate date = parseDate(view.ask("Date received (yyyy-MM-dd) [today]"));
-        Donation donation = donations.recordDonation(donorId, typeText, date, details, LocalDate.now());
-        view.showMessage("Recorded " + donation.summary());
-    }
-
-    private void taxStatement() {
-        String donorId = askId("Donor id");
-        String yearText = view.ask("Tax year [" + LocalDate.now().getYear() + "]");
-        int year = yearText.isEmpty() ? LocalDate.now().getYear() : parseInt(yearText, "Year");
-        view.showText(donations.taxStatement(donorId, year, LocalDate.now()));
-    }
-
-    private void createCampaign() {
-        String name = view.ask("Campaign name");
-        double goal = parseDouble(view.ask("Goal"), "Goal");
-        Campaign campaign = donations.createCampaign(name, goal);
-        view.showMessage("Created campaign " + campaign.summary());
-    }
-
-    private void donationTotals() {
-        String text = view.ask("How many top donors? [3]");
-        int top = text.isEmpty() ? 3 : parseInt(text, "Number of top donors");
-        view.showText(donationSummary(donations, top));
-    }
-
-    /** Totals by method, campaign progress and the top donors (also printed by the demo). */
-    static String donationSummary(DonationService donations, int top) {
-        List<Donor> ranked = donations.topDonors(top);
-        StringBuilder sb = new StringBuilder(donations.summaryReport());
-        for (Campaign campaign : donations.listCampaigns()) {
-            sb.append("\n  Campaign ").append(campaign.summary());
-        }
-        if (!ranked.isEmpty()) {
-            sb.append("\n  Top donors:");
-            for (Donor donor : ranked) {
-                sb.append("\n    ").append(donor.summary());
-            }
-        }
-        return sb.toString();
     }
 
     // ---- Events ----
@@ -599,14 +471,6 @@ public class MainMenuController {
 
     // ---- Looking records up by id ----
 
-    private Donor requireDonor(String id) {
-        Donor donor = donations.findDonor(id);
-        if (donor == null) {
-            throw new IllegalArgumentException("No donor with id " + id);
-        }
-        return donor;
-    }
-
     private Event requireEvent(String id) {
         return events.findEvent(id).orElseThrow(() -> new IllegalArgumentException("No event with id " + id));
     }
@@ -658,7 +522,7 @@ public class MainMenuController {
 
     // ---- Turning objects into lines ----
 
-    /** One line per record, e.g. {@code lines(donors, Donor::summary)}. */
+    /** One line per record, e.g. {@code lines(events, Event::summary)}. */
     private static <T> List<String> lines(List<T> records, Function<T, String> toLine) {
         List<String> lines = new ArrayList<>();
         for (T record : records) {
@@ -726,23 +590,6 @@ public class MainMenuController {
         } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("Date and time must look like 2026-12-01 18:00");
         }
-    }
-
-    /** Empty means today; a date in the future is refused (backdating into a tax year is fine). */
-    private static LocalDate parseDate(String text) {
-        if (text.isEmpty()) {
-            return LocalDate.now();
-        }
-        LocalDate date;
-        try {
-            date = LocalDate.parse(text.trim());
-        } catch (DateTimeParseException e) {
-            throw new IllegalArgumentException("Date must look like 2026-03-15");
-        }
-        if (date.isAfter(LocalDate.now())) {
-            throw new IllegalArgumentException("A donation cannot be dated in the future");
-        }
-        return date;
     }
 
     private static boolean parseYesNo(String text) {

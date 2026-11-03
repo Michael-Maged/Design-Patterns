@@ -8,7 +8,7 @@ The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-sys
 
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
-| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory Method, Template Method | [`output/donation.puml`](output/donation.puml) | **Done** |
+| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory Method, Template Method, Observer, MVC | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Simple Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | [`output/beneficiary.puml`](output/beneficiary.puml) | **Done** |
@@ -35,10 +35,14 @@ Other features: capacity limits, a **waitlist with automatic promotion** when so
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Factory Method** | `DonationProcessor` (creator), `OnlineDonationProcessor`, `CheckDonationProcessor`, `InKindDonationProcessor` (concrete creators), `Donation` and its three subclasses (products) | `DonationProcessor.receive()` is the same for every donation: create it, give it the next number, add it to the donor's history. The create step is the factory method `createDonation()`, and each concrete creator decides which donation class to build, like the textbook's `PizzaStore`. `DonationService` only depends on the abstract creator and the abstract `Donation`. |
-| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxDeductionStatement` | `DonationDocument.generate()` is final and always builds header, body, totals and footer (as text the view shows). A receipt covers one donation; a tax statement lists a donor's donations for one year with money and goods totals. A document with nothing to show (a tax year with no donations) is refused with an `IllegalStateException` instead of being generated. |
+| **Factory Method** | `DonationCreator` (creator), `OnlineDonationCreator`, `CheckDonationCreator`, `InKindDonationCreator` (concrete creators), `Donation` and its subclasses `OnlineDonation`, `CheckDonation`, `InKindDonation` (products) | `DonationCreator.receive()` is final and is the same for every donation: call the factory method `createDonation()`, then add the donation to the donor's history. Each concrete creator decides which donation class to build. `DonationService` only knows the abstract creator and the abstract `Donation`. A new donation method means one new product class plus one new creator, plugged in with `addCreator()`. |
+| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxStatement` | `DonationDocument.generate()` is final and always prints header, body, totals, footer. A receipt covers one donation. A tax statement lists a donor's donations for one year, with money and goods totalled separately. The `canBeIssued()` hook stops an empty statement from being printed. |
+| **Observer** | `DonationService` (publisher), `DonationView` and `CommunicationService` (observers) | Every new donation is published on the `EventBus` as `DONATION_RECEIVED`. The Communication module sends the thank-you message and the screen shows a notification. `DonationService` never calls either of them directly. |
+| **MVC** | `DonationView`, `DonationController`, `DonationService` (model), `DonationApp` | An interactive console screen. The view only prints and reads input, and the controller turns menu choices into calls on the service. |
 
-Other features: recurring monthly online gifts shown on the receipt (extended requirement 1), **campaign goals with progress** (extended requirement 2), totals by donation method, top donors, receipt numbers with no gaps when a bad donation is rejected, donations dated in the future refused (`recordDonation(..., today)`), donor contact details editable (`updateDonor`), and donor records kept while they have donations. Each donation is published on the `EventBus` as `DONATION_RECEIVED` so the Communication module can thank the donor. `DonationService` is the module's entry point and is what the main menu calls.
+Client requirements collected for this module: **monthly online gifts** (shown on the receipt) and **campaigns with a money goal and progress percentage**. Other features: totals by method, top donors, input checks (missing check number, negative amount, unknown campaign...), donation numbers with no gaps when a bad donation is rejected, and donors who have already given can't be deleted. `DonationService` is the module's entry point; the main menu opens this module's own screen (`DonationController` + `DonationView`) on the shared `DonationService` from `DataStore`.
+
+Fixes made while integrating it into the main menu: donor contact details can be edited (`updateDonor`, menu option 11); the screen asks for the date received (empty = today) so a donation can be backdated into a tax year, and `donate(..., today)` refuses a future date; an `Infinity` amount or campaign goal is refused like `NaN`; donor and donation ids can be typed in any case (`dnr-1`, `don-1`).
 
 ## Volunteers module (Student 2)
 
@@ -76,11 +80,11 @@ The new classes live in `org.nonprofit.app`, not in `core`. They have to import 
 | Pattern | Where | What it does |
 |---|---|---|
 | **Singleton** | `DataStore` | Lazily created, thread-safe single instance that owns the one copy of each module service. `CommunicationService` is created only here, so no message is sent twice. It also passes the volunteers to `BeneficiaryService` as the urgent responders. A small attendee registry lives here too, so the menu can pick people for events, and `membersOf(BroadcastGroup)` builds the recipient list for a group broadcast. |
-| **MVC** | `MainMenuView` (view), `MainMenuController` (controller), the module services (model) | Main menu with 1 Donations, 2 Volunteers, 3 Events, 4 Beneficiaries, 5 Communication. The controller gets each service from `DataStore.getInstance()` and calls it directly; the view only prints and reads. Volunteers opens the existing `VolunteerController` screen on the shared service (its option 0 says "Back" there). Results start with `>>`, errors with `!!`, IDs can be typed in any case (`ben-1`), and bad input never ends the program. After each action the controller takes the new messages from `CommunicationService.takeOutput()` and the attendees' new notes, and the view prints them. |
+| **MVC** | `MainMenuView` (view), `MainMenuController` (controller), the module services (model) | Main menu with 1 Donations, 2 Volunteers, 3 Events, 4 Beneficiaries, 5 Communication. The controller gets each service from `DataStore.getInstance()` and calls it directly; the view only prints and reads. Donations and Volunteers open each module's own screen (`DonationController`, `VolunteerController`) on the shared service (their option 0 says "Back" there). Results start with `>>`, errors with `!!`, IDs can be typed in any case (`ben-1`), and bad input never ends the program. After each action the controller takes the new messages from `CommunicationService.takeOutput()` and the attendees' new notes, and the view prints them. |
 
 What the menus offer:
 
-- **Donations**: list, register, update contact details and remove donors (a donor with donations cannot be removed); a donor's full history; record a donation with a typed date (default today, so it can be backdated into a tax year; a future date is refused); receipts and tax statements; create and list campaigns with progress; totals with the top N donors.
+- **Donations**: the module's own screen (list, add, remove and update donors; add and list campaigns; make a donation with a typed date, default today, so it can be backdated into a tax year while a future date is refused; list donations; receipts and tax statements; summary and top donors). The thank-you messages Communication sends are shown after each action.
 - **Events**: list all events or the upcoming ones by date; create; edit (rename, reschedule, relocate, capacity, base ticket price, fundraiser goal and pledges, workshop topic and instructor, outreach target community); register an attendee with add-ons (a new person is checked first and only stored when the registration goes through, and their `ATT-` id is printed); cancel a registration or leave the waitlist; check in; update an attendee's contact details; a reminder for one event or for the next 24 hours; attendance report; cancel or delete an event (only an event nobody has signed up for can be deleted). Registration and reminders use the current time, so an event that has started is refused, and a cancelled event refuses every edit.
 - **Beneficiaries**: list, register, update and remove beneficiaries; add, update and remove needs; list open needs; change the allocation rule; preview a distribution before handing anything out; distribute stock; give units directly to one need; list distributions; impact reports.
 - **Volunteers**: the module's own screen (profiles, contact details, tasks including updating one, assignment rule, hours, leaderboard, certificates).
@@ -100,11 +104,12 @@ java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
 java -cp bin org.nonprofit.volunteer.VolunteerApp
 java -cp bin org.nonprofit.donation.DonationDemo
+java -cp bin org.nonprofit.donation.DonationApp
 java -cp bin org.nonprofit.communication.CommunicationDemo
 java -cp bin org.nonprofit.beneficiary.BeneficiaryDemo
 ```
 
-In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` opens the interactive Volunteers screen; the `...Demo` classes run a fixed walkthrough.
+In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` and `DonationApp` open the interactive Volunteers and Donations screens; the `...Demo` classes run a fixed walkthrough.
 
 ## Diagrams
 

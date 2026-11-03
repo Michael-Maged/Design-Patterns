@@ -2,19 +2,24 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** A donation paid by check. FACTORY METHOD pattern - ConcreteProduct. */
+/** Money paid with a paper check. We keep the check number and the bank for our records. */
 public class CheckDonation extends Donation {
     private final String checkNumber;
     private final String bankName;
 
-    CheckDonation(String id, Donor donor, double amount, LocalDate date, String campaign,
+    CheckDonation(String id, Donor donor, double amount, LocalDate date,
                   String checkNumber, String bankName) {
-        super(id, donor, amount, date, campaign);
+        super(id, donor, amount, date);
         if (checkNumber == null || checkNumber.isBlank()) {
             throw new IllegalArgumentException("Check donations need a check number");
         }
         this.checkNumber = checkNumber;
-        this.bankName = bankName == null || bankName.isBlank() ? "unknown bank" : bankName;
+        // The bank is nice to have but not required.
+        if (bankName == null || bankName.isBlank()) {
+            this.bankName = "unknown bank";
+        } else {
+            this.bankName = bankName;
+        }
     }
 
     @Override
@@ -22,11 +27,11 @@ public class CheckDonation extends Donation {
         return DonationType.CHECK;
     }
 
+    @Override
+    public String getDetails() {
+        return "check #" + checkNumber + " from " + bankName;
+    }
+
     public String getCheckNumber() { return checkNumber; }
     public String getBankName() { return bankName; }
-
-    @Override
-    public String details() {
-        return "check #" + checkNumber + ", " + bankName;
-    }
 }

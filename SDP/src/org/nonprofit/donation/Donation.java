@@ -3,57 +3,65 @@ package org.nonprofit.donation;
 import java.time.LocalDate;
 
 /**
- * Base class for all donations. {@code value} is the money given, or the
- * estimated value of goods for an in-kind donation.
+ * What every donation has in common: who gave it, how much, and when.
+ * For an in-kind donation (goods) the amount is the estimated value of the goods.
  *
- * FACTORY METHOD pattern - Product. The concrete products are created only by
- * the {@link DonationProcessor} subclasses (the concrete creators).
+ * The class is abstract because a donation is always one of the concrete
+ * types (online, check or in-kind). Those objects are built by the
+ * DonationCreator subclasses (Factory Method pattern).
  */
 public abstract class Donation {
     private final String id;
     private final Donor donor;
-    private final double value;
+    private final double amount;
     private final LocalDate date;
-    private final String campaign;
+    private Campaign campaign; // null when the donation is not for a campaign
 
-    protected Donation(String id, Donor donor, double value, LocalDate date, String campaign) {
+    protected Donation(String id, Donor donor, double amount, LocalDate date) {
         if (donor == null) {
             throw new IllegalArgumentException("Donor is required");
         }
-        // NaN ("not a number") and Infinity would slip past "value <= 0", so they are checked too.
-        if (!Double.isFinite(value) || value <= 0) {
-            throw new IllegalArgumentException("Donation amount must be a positive number");
+        // Double.isFinite is needed because NaN and Infinity are not caught by "amount <= 0".
+        if (!Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Donation amount must be more than zero");
         }
         if (date == null) {
             throw new IllegalArgumentException("Donation date is required");
         }
         this.id = id;
         this.donor = donor;
-        this.value = value;
+        this.amount = amount;
         this.date = date;
-        this.campaign = campaign;
     }
 
+    /** Each subclass says which type it is. */
     public abstract DonationType getType();
 
-    /** Type-specific information shown on summaries and receipts. */
-    public abstract String details();
+    /** Each subclass describes its own extra info (payment ref, check number, item...). */
+    public abstract String getDetails();
 
     public String getId() { return id; }
     public Donor getDonor() { return donor; }
-    public double getValue() { return value; }
+    public double getAmount() { return amount; }
     public LocalDate getDate() { return date; }
-    /** The campaign this donation counts towards, or null. */
-    public String getCampaign() { return campaign; }
+    public Campaign getCampaign() { return campaign; }
 
-    public String summary() {
-        return String.format("%s [%s] %s | %s on %s | %s%s",
-                id, getType(), donor.getName(), DonationDocument.money(value), date, details(),
-                campaign == null ? "" : " | campaign: " + campaign);
+    void setCampaign(Campaign campaign) {
+        this.campaign = campaign;
+    }
+
+    /** Formats money the same way everywhere in the module, e.g. $1,250.00 */
+    public static String money(double amount) {
+        return String.format("$%,.2f", amount);
     }
 
     @Override
     public String toString() {
-        return getType() + " donation " + id;
+        String text = id + " | " + getType() + " | " + donor.getName() + " | " + money(amount)
+                + " | " + date + " | " + getDetails();
+        if (campaign != null) {
+            text += " | campaign: " + campaign.getName();
+        }
+        return text;
     }
 }

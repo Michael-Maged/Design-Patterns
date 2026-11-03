@@ -1,71 +1,56 @@
 package org.nonprofit.donation;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.Person;
 
-/** A person or organization that gives to the non-profit, with their donation history. */
+/**
+ * A person or a company that gives to the organization.
+ * Besides the normal contact info (from Person) a donor keeps a history
+ * of every donation they made, which we need for the tax statement.
+ */
 public class Donor extends Person {
-    private static int nextId = 1;
-
     private final List<Donation> donations = new ArrayList<>();
 
-    public Donor(String name, String email, String phone, ContactPreference preferredContact) {
-        super(takeId(name), name, email, phone, preferredContact);
+    public Donor(String id, String name, String email, String phone, ContactPreference preferredContact) {
+        super(id, name, email, phone, preferredContact);
     }
 
-    /** Checks the name before taking a number, so a rejected donor does not use one up. */
-    private static String takeId(String name) {
-        requireName(name);
-        return "DNR-" + nextId++;
-    }
-
-    /** Donors are thanked by e-mail unless they ask otherwise. */
-    public Donor(String name, String email, String phone) {
-        this(name, email, phone, ContactPreference.EMAIL);
-    }
-
+    /** Only the service adds donations, so this is package-private on purpose. */
     void addDonation(Donation donation) {
         donations.add(donation);
     }
 
-    /** A copy, so callers cannot change the donor's history. */
+    /** Returns a copy so nobody outside can change the donor's history. */
     public List<Donation> getDonations() {
         return new ArrayList<>(donations);
     }
 
-    /** Donations made in one calendar year, oldest first. */
-    public List<Donation> donationsIn(int year) {
+    /** All donations made in one year, oldest first (used by the tax statement). */
+    public List<Donation> getDonationsIn(int year) {
         List<Donation> result = new ArrayList<>();
-        for (Donation d : donations) {
-            if (d.getDate().getYear() != year) {
-                continue;
+        for (Donation donation : donations) {
+            if (donation.getDate().getYear() == year) {
+                result.add(donation);
             }
-            // Insert before the first donation with a later date.
-            int position = result.size();
-            for (int i = 0; i < result.size(); i++) {
-                if (result.get(i).getDate().isAfter(d.getDate())) {
-                    position = i;
-                    break;
-                }
-            }
-            result.add(position, d);
         }
+        result.sort(Comparator.comparing(Donation::getDate));
         return result;
     }
 
     public double getTotalGiven() {
         double total = 0;
-        for (Donation d : donations) {
-            total += d.getValue();
+        for (Donation donation : donations) {
+            total += donation.getAmount();
         }
         return total;
     }
 
     public String summary() {
-        return String.format("%s %s | %d donation(s), %s in total",
-                getId(), getName(), donations.size(), DonationDocument.money(getTotalGiven()));
+        return getId() + " | " + getName() + " | " + donations.size() + " donation(s) | "
+                + Donation.money(getTotalGiven()) + " in total";
     }
 }

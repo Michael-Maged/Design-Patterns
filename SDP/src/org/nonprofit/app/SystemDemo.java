@@ -17,9 +17,13 @@ import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.communication.SentMessage;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
+import org.nonprofit.donation.Campaign;
 import org.nonprofit.donation.Donation;
-import org.nonprofit.donation.DonationDetails;
+import org.nonprofit.donation.DonationController;
+import org.nonprofit.donation.DonationForm;
 import org.nonprofit.donation.DonationService;
+import org.nonprofit.donation.DonationType;
+import org.nonprofit.donation.DonationView;
 import org.nonprofit.donation.Donor;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.event.Event;
@@ -94,38 +98,70 @@ public final class SystemDemo {
     // ---- Donations ----
 
     private void donations() {
-        heading("FACTORY METHOD - donations created from text; OBSERVER sends the thank-you");
-        Donor hany = donations.registerDonor(
-                new Donor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL));
-        Donor rania = donations.registerDonor(
-                new Donor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS));
-        Donor bakery = donations.registerDonor(
-                new Donor("El Nour Bakery", "orders@elnour.example", "+20120000003", ContactPreference.EMAIL));
-        donations.createCampaign("Winter Blankets", 15_000);
+        heading("FACTORY METHOD - each creator decides which donation to build; OBSERVER sends the thank-you");
+        Donor hany = donations.addDonor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL);
+        Donor rania = donations.addDonor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS);
+        Donor bakery = donations.addDonor("El Nour Bakery", "orders@elnour.example", "+20120000003",
+                ContactPreference.EMAIL);
+        donations.addCampaign("Winter Blankets", 15_000);
+        for (DonationType type : DonationType.values()) {
+            System.out.println("  " + type + " is handled by " + donations.getCreator(type).getClass().getSimpleName());
+        }
 
         int before = logSize();
-        Donation online = donations.recordDonation(hany.getId(), "online", TODAY.minusMonths(9),
-                DonationDetails.of(500).reference("PAY-88213").recurring());
-        Donation check = donations.recordDonation(rania.getId(), "check", TODAY.minusMonths(2),
-                DonationDetails.of(2_000).reference("004517").bank("National Bank of Egypt").campaign("Winter Blankets"));
-        Donation goods = donations.recordDonation(bakery.getId(), "in-kind", TODAY.minusDays(5),
-                DonationDetails.of(1_200).item("300 loaves of bread for the food drive"));
-        donations.recordDonation(hany.getId(), "online", TODAY.minusDays(1),
-                DonationDetails.of(4_500).reference("PAY-90410").campaign("winter blankets"));
+        DonationForm onlineForm = new DonationForm(500);
+        onlineForm.setReference("PAY-88213");
+        onlineForm.setMonthly(true);
+        Donation online = donations.donate(hany.getId(), "online", TODAY.minusMonths(9), onlineForm);
+        DonationForm checkForm = new DonationForm(2_000);
+        checkForm.setReference("004517");
+        checkForm.setBank("National Bank of Egypt");
+        checkForm.setCampaign("Winter Blankets");
+        Donation check = donations.donate(rania.getId(), "check", TODAY.minusMonths(2), checkForm);
+        DonationForm goodsForm = new DonationForm(1_200);
+        goodsForm.setItem("300 loaves of bread for the food drive");
+        Donation goods = donations.donate(bakery.getId(), "in-kind", TODAY.minusDays(5), goodsForm);
+        DonationForm bigGift = new DonationForm(4_500);
+        bigGift.setReference("PAY-90410");
+        bigGift.setCampaign("winter blankets"); // case doesn't matter
+        donations.donate(hany.getId(), "online", TODAY.minusDays(1), bigGift);
         sent(before, 4);
         for (Donation d : List.of(online, check, goods)) {
-            System.out.println("  text -> " + d.getClass().getSimpleName() + ": " + d.summary());
+            System.out.println("  text -> " + d.getClass().getSimpleName() + ": " + d);
         }
+        tryDonate(hany.getId(), "crypto", TODAY, new DonationForm(10));                       // unknown type
+        DonationForm infinite = new DonationForm(Double.POSITIVE_INFINITY);
+        infinite.setReference("PAY-1");
+        tryDonate(hany.getId(), "online", TODAY, infinite);                                   // not a real amount
+        DonationForm future = new DonationForm(50);
+        future.setReference("PAY-2");
+        tryDonate(hany.getId(), "online", TODAY.plusDays(1), future);                         // dated after today
+        Donor updated = donations.updateDonor(rania.getId(), "Rania Kamel", "rania.kamel@example.org",
+                "+20120000002", ContactPreference.EMAIL);
+        System.out.println("  Updated contact: " + updated + " now " + updated.getEmail() + " by "
+                + updated.getPreferredContact());
+
+        heading("TEMPLATE METHOD - a receipt and a tax statement share one layout");
+        System.out.println(donations.makeReceipt(online.getId(), TODAY));
+        System.out.println(donations.makeTaxStatement(hany.getId(), 2026, TODAY));
+        System.out.println(donations.summaryReport());
+        for (Campaign campaign : donations.getCampaigns()) {
+            System.out.println("  Campaign " + campaign);
+        }
+        System.out.println("  Top donors:");
+        for (Donor donor : donations.getTopDonors(3)) {
+            System.out.println("    " + donor.summary());
+        }
+    }
+
+    /** Donations dated with the demo's fixed "today", so a later date is refused. */
+    private void tryDonate(String donorId, String type, LocalDate date, DonationForm form) {
         try {
-            donations.recordDonation(hany.getId(), "crypto", TODAY, DonationDetails.of(10));
+            donations.donate(donorId, DonationType.fromText(type), date, form, TODAY);
+            System.out.println("  Accepted (this should not happen!)");
         } catch (IllegalArgumentException e) {
             System.out.println("  Rejected: " + e.getMessage());
         }
-
-        heading("TEMPLATE METHOD - a receipt and a tax statement share one layout");
-        System.out.println(donations.receipt(online.getId(), TODAY));
-        System.out.println(donations.taxStatement(hany.getId(), 2026, TODAY));
-        System.out.println(MainMenuController.donationSummary(donations, 3));
     }
 
     // ---- Volunteers ----
@@ -282,12 +318,14 @@ public final class SystemDemo {
                 "0") + "\n";          // Exit
         System.out.println("  Scripted input: " + typed.replace("\n", " ").trim());
         Scanner in = new Scanner(typed);
+        DonationController donationScreen = new DonationController(donations, new DonationView(in), true,
+                communication::takeOutput);
         VolunteerController volunteerScreen = new VolunteerController(volunteers,
                 new VolunteerView(in, System.out), true, communication::takeOutput);
-        new MainMenuController(store, new MainMenuView(in, System.out), volunteerScreen).run();
+        new MainMenuController(store, new MainMenuView(in, System.out), donationScreen, volunteerScreen).run();
 
         System.out.println();
-        System.out.println("  " + donations.listDonors().size() + " donors, " + donations.listDonations().size()
+        System.out.println("  " + donations.getDonors().size() + " donors, " + donations.getDonations().size()
                 + " donations, " + volunteers.listVolunteers().size() + " volunteers, "
                 + volunteers.listTasks().size() + " tasks, " + events.listEvents().size() + " events, "
                 + store.listAttendees().size() + " attendees, " + beneficiaries.listBeneficiaries().size()

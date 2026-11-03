@@ -9,13 +9,13 @@ import java.util.Scanner;
  * It prints menus, lists and messages and reads what the user types, but
  * makes no decisions - the {@link MainMenuController} does that.
  * Results start with {@code >>} and errors with {@code !!}, like the
- * Volunteers screen.
+ * Volunteers screen. (The Donations screen is the module's own MVC screen.)
  */
 public class MainMenuView {
     private final Scanner in;
     private final PrintStream out;
 
-    /** The Scanner is shared with the Volunteers screen, so both read the same input. */
+    /** The Scanner is shared with the Donations and Volunteers screens, so all read the same input. */
     public MainMenuView(Scanner in, PrintStream out) {
         this.in = in;
         this.out = out;
@@ -26,14 +26,6 @@ public class MainMenuView {
     public int showMainMenu() {
         return showMenu("NON-PROFIT MANAGEMENT SYSTEM", null, "Exit",
                 "Donations", "Volunteers", "Events", "Beneficiaries", "Communication");
-    }
-
-    public int showDonationMenu() {
-        return showMenu("DONATIONS", null, "Back",
-                "List donors", "Register a donor", "Update a donor's contact details", "Remove a donor",
-                "A donor's donation history", "Record a donation", "List donations",
-                "Print a receipt", "Print a tax statement",
-                "Create a campaign", "List campaigns with progress", "Totals and top donors");
     }
 
     public int showEventMenu() {

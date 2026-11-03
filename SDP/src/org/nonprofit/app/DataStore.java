@@ -16,7 +16,7 @@ import org.nonprofit.volunteer.VolunteerService;
 /**
  * SINGLETON pattern: the one in-memory data store of the whole system.
  * It owns the single instance of every module service, so the main menu,
- * the Volunteers screen and the demo all work on the same donors,
+ * the Donations and Volunteers screens and the demo all work on the same donors,
  * volunteers, events and beneficiaries.
  * Each service keeps its own records; this class does not copy them.
  *
@@ -98,7 +98,7 @@ public final class DataStore {
         }
         switch (group) {
             case DONORS:
-                return donationService.listDonors();
+                return donationService.getDonors();
             case VOLUNTEERS:
                 return volunteerService.listVolunteers();
             case BENEFICIARIES:

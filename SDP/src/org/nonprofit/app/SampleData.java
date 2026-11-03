@@ -9,7 +9,7 @@ import org.nonprofit.beneficiary.Beneficiary;
 import org.nonprofit.beneficiary.BeneficiaryService;
 import org.nonprofit.beneficiary.Urgency;
 import org.nonprofit.core.ContactPreference;
-import org.nonprofit.donation.DonationDetails;
+import org.nonprofit.donation.DonationForm;
 import org.nonprofit.donation.DonationService;
 import org.nonprofit.donation.Donor;
 import org.nonprofit.event.Attendee;
@@ -36,19 +36,23 @@ public final class SampleData {
 
         // ---- Donations ----
         DonationService donations = store.getDonationService();
-        Donor hany = donations.registerDonor(
-                new Donor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL));
-        Donor rania = donations.registerDonor(
-                new Donor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS));
-        Donor bakery = donations.registerDonor(
-                new Donor("El Nour Bakery", "orders@elnour.example", "+20120000003", ContactPreference.EMAIL));
-        donations.createCampaign("Winter Blankets", 15_000);
-        donations.recordDonation(hany.getId(), "online", today.minusDays(20),
-                DonationDetails.of(500).reference("PAY-88213").recurring());
-        donations.recordDonation(rania.getId(), "check", today.minusDays(10),
-                DonationDetails.of(2_000).reference("004517").bank("National Bank of Egypt").campaign("Winter Blankets"));
-        donations.recordDonation(bakery.getId(), "in-kind", today.minusDays(5),
-                DonationDetails.of(1_200).item("300 loaves of bread for the food drive"));
+        Donor hany = donations.addDonor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL);
+        Donor rania = donations.addDonor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS);
+        Donor bakery = donations.addDonor("El Nour Bakery", "orders@elnour.example", "+20120000003",
+                ContactPreference.EMAIL);
+        donations.addCampaign("Winter Blankets", 15_000);
+        DonationForm online = new DonationForm(500);
+        online.setReference("PAY-88213");
+        online.setMonthly(true);
+        donations.donate(hany.getId(), "online", today.minusDays(20), online);
+        DonationForm check = new DonationForm(2_000);
+        check.setReference("004517");
+        check.setBank("National Bank of Egypt");
+        check.setCampaign("Winter Blankets");
+        donations.donate(rania.getId(), "check", today.minusDays(10), check);
+        DonationForm goods = new DonationForm(1_200);
+        goods.setItem("300 loaves of bread for the food drive");
+        donations.donate(bakery.getId(), "in-kind", today.minusDays(5), goods);
 
         // ---- Volunteers (before beneficiaries, so urgent needs reach them) ----
         VolunteerService volunteers = store.getVolunteerService();

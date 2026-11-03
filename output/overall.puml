@@ -2,7 +2,7 @@
 ' Whole system (CSE336 non-profit management system): overall class diagram with every design pattern marked.
 ' Written by hand from the source in SDP/src (all org.nonprofit packages plus App.java); the UML generator was not used.
 ' Only the important fields and methods are shown. Left out on purpose: demo classes (*Demo, SystemDemo,
-' VolunteerApp; SampleData is shown only as App's loader), trivial getters/setters, private helpers, id counters, and minor value types
+' VolunteerApp, DonationApp; SampleData is shown only as App's loader), trivial getters/setters, private helpers, id counters, and minor value types
 ' (HourEntry, WaitlistEntry, EventChange, RegistrationResult, Campaign, SentMessage, Message, DonationType, Urgency).
 ' The per-module diagrams (core, donation, volunteer, event, beneficiary, communication .puml) have the full detail.
 skinparam classAttributeIconSize 0
@@ -26,6 +26,7 @@ package "org.nonprofit.app" as app #FFF3E0 {
   class MainMenuController <<Controller>> {
     -store: DataStore
     -view: MainMenuView
+    -donationScreen: DonationController
     -volunteerScreen: VolunteerController
     --
     +run(): void
@@ -132,76 +133,114 @@ package "org.nonprofit.core" as core #F5F5F5 {
     <b>SINGLETON + OBSERVER</b>: EventBus (Subject, getInstance()),
     SystemObserver (Observer), SystemEvent (message).
     Services publish; CommunicationService subscribes to every type,
-    VolunteerView to VOLUNTEER_ASSIGNED.
+    DonationView to DONATION_RECEIVED, VolunteerView to VOLUNTEER_ASSIGNED.
   end note
 }
 
 ' ============================================================ donation
 package "org.nonprofit.donation" as donation #E8F5E9 {
-  class DonationService {
-    -processors: Map<DonationType, DonationProcessor>
-    -bus: EventBus
+  class DonationController <<Controller>> {
+    -service: DonationService
+    -view: DonationView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
     --
-    +registerDonor(donor: Donor): Donor
+    +run(): void
+  }
+
+  class DonationView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +ask(question: String): String
+    +showDeliveries(lines: List<String>): void
+    +onEvent(event: SystemEvent): void
+  }
+
+  class DonationService <<Model>> {
+    -donors: Map<String, Donor>
+    -donations: Map<String, Donation>
+    -campaigns: Map<String, Campaign>
+    -creators: Map<DonationType, DonationCreator>
+    --
+    +addDonor(name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
     +updateDonor(donorId: String, name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
-    +removeDonor(donorId: String): boolean
-    +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails): Donation
-    +receipt(donationId: String, issueDate: LocalDate): String
-    +taxStatement(donorId: String, year: int, issueDate: LocalDate): String
+    +removeDonor(donorId: String): void
+    +getDonors(): List<Donor>
+    +addCampaign(name: String, goal: double): Campaign
+    +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm): Donation
+    +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm, today: LocalDate): Donation
+    +donate(donorId: String, typeText: String, date: LocalDate, form: DonationForm): Donation
+    +getTopDonors(howMany: int): List<Donor>
+    +summaryReport(): String
+    +makeReceipt(donationId: String, issueDate: LocalDate): String
+    +makeTaxStatement(donorId: String, year: int, issueDate: LocalDate): String
   }
 
   class Donor {
     -donations: List<Donation>
     --
+    +getDonationsIn(year: int): List<Donation>
     +getTotalGiven(): double
+    +summary(): String
   }
 
-  abstract class DonationProcessor <<Creator>> {
-    +receive(donor: Donor, date: LocalDate, details: DonationDetails): Donation
-    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, details: DonationDetails): Donation
+  abstract class DonationCreator <<Creator>> {
+    +receive(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation {final}
+    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation
+    +{abstract} getType(): DonationType
   }
-  class OnlineDonationProcessor <<ConcreteCreator>>
-  class CheckDonationProcessor <<ConcreteCreator>>
-  class InKindDonationProcessor <<ConcreteCreator>>
+  class OnlineDonationCreator <<ConcreteCreator>>
+  class CheckDonationCreator <<ConcreteCreator>>
+  class InKindDonationCreator <<ConcreteCreator>>
 
   abstract class Donation <<Product>> {
+    -id: String
     -donor: Donor
-    -value: double
+    -amount: double
     -date: LocalDate
     --
     +{abstract} getType(): DonationType
-    +{abstract} details(): String
+    +{abstract} getDetails(): String
   }
   class OnlineDonation <<ConcreteProduct>>
   class CheckDonation <<ConcreteProduct>>
   class InKindDonation <<ConcreteProduct>>
 
-  class DonationDetails {
-    +{static} of(amount: double): DonationDetails
-    +reference(reference: String): DonationDetails
+  class DonationForm {
+    -amount: double
+    -reference: String
+    -bank: String
+    -item: String
+    -monthly: boolean
+    -campaign: String
   }
 
   abstract class DonationDocument <<AbstractClass>> {
-    #issueDate: LocalDate
+    -issueDate: LocalDate
     --
-    +generate(): String
-    #{abstract} title(): String
+    +generate(): String {final}
+    #{abstract} getTitle(): String
     #{abstract} body(): String
     #{abstract} totals(): String
+    #canBeIssued(): boolean
   }
   class DonationReceipt <<ConcreteClass>>
-  class TaxDeductionStatement <<ConcreteClass>>
+  class TaxStatement <<ConcreteClass>>
 
-  note bottom of DonationProcessor
-    <b>FACTORY METHOD</b>: DonationProcessor (Creator) with final
+  note top of DonationController
+    <b>MVC</b>: DonationView (View, also a SystemObserver),
+    DonationController (Controller), DonationService (Model).
+  end note
+
+  note bottom of DonationCreator
+    <b>FACTORY METHOD</b>: DonationCreator (Creator) with final
     receive() calling createDonation(); Online/Check/InKind
-    processors (ConcreteCreator) build the matching Donation (Product).
+    creators (ConcreteCreator) build the matching Donation (Product).
   end note
 
   note bottom of DonationDocument
     <b>TEMPLATE METHOD</b>: generate() is final:
     header -> body -> totals -> footer.
-    DonationReceipt, TaxDeductionStatement fill the steps.
+    DonationReceipt, TaxStatement fill the steps.
   end note
 }
 
@@ -538,15 +577,17 @@ package "org.nonprofit.communication" as communication #FFFDE7 {
 App ..> DataStore : getInstance()
 App ..> MainMenuController : <<creates>> / run()
 App ..> MainMenuView : <<creates>>
+App ..> DonationController : <<creates>>
+App ..> DonationView : <<creates>>
 App ..> VolunteerController : <<creates>>
 App ..> VolunteerView : <<creates>>
 App ..> SampleData : load(store)
 SampleData ..> DataStore
 MainMenuController --> MainMenuView
 MainMenuController --> DataStore
+MainMenuController --> DonationController : opens Donations screen (Back)
 MainMenuController --> VolunteerController : opens Volunteers screen (Back)
 MainMenuController ..> BroadcastGroup
-MainMenuController ..> DonationService
 MainMenuController ..> EventService
 MainMenuController ..> BeneficiaryService
 MainMenuController ..> CommunicationService
@@ -573,6 +614,7 @@ Beneficiary -down-|> Person
 
 ' Observer on the system bus
 CommunicationService .down.|> SystemObserver
+DonationView .down.|> SystemObserver
 VolunteerView .down.|> SystemObserver
 DonationService ..> EventBus : publish
 VolunteerService ..> EventBus : publish
@@ -580,25 +622,28 @@ EventService ..> EventBus : publish
 BeneficiaryService ..> EventBus : publish
 EventBusNotifier ..> EventBus : publish
 CommunicationService ..> EventBus : subscribe(all types)
+DonationController ..> EventBus : subscribe(view)
 VolunteerController ..> EventBus : subscribe(view)
 Event .down.|> Audience
 BeneficiaryService --> Audience : urgentResponders
 CommunicationService ..> Audience : broadcast to source audience
 
 ' ============================================================ relationships: donation
+DonationController --> DonationService : model
+DonationController --> DonationView
 DonationService o-- "*" Donor
-DonationService o-- "*" DonationProcessor
-DonationProcessor <|-- OnlineDonationProcessor
-DonationProcessor <|-- CheckDonationProcessor
-DonationProcessor <|-- InKindDonationProcessor
-DonationProcessor ..> Donation : <<creates>>
-DonationProcessor ..> DonationDetails
+DonationService o-- "3" DonationCreator : creators
+DonationCreator <|-- OnlineDonationCreator
+DonationCreator <|-- CheckDonationCreator
+DonationCreator <|-- InKindDonationCreator
+DonationCreator ..> Donation : <<creates>>
+DonationCreator ..> DonationForm : reads
 Donation <|-- OnlineDonation
 Donation <|-- CheckDonation
 Donation <|-- InKindDonation
 Donor "1" -- "*" Donation
 DonationDocument <|-- DonationReceipt
-DonationDocument <|-- TaxDeductionStatement
+DonationDocument <|-- TaxStatement
 DonationService ..> DonationDocument : <<issues>>
 
 ' ============================================================ relationships: volunteer

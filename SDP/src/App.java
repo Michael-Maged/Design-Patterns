@@ -6,6 +6,8 @@ import org.nonprofit.app.MainMenuController;
 import org.nonprofit.app.MainMenuView;
 import org.nonprofit.app.SampleData;
 import org.nonprofit.app.SystemDemo;
+import org.nonprofit.donation.DonationController;
+import org.nonprofit.donation.DonationView;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.volunteer.VolunteerController;
 import org.nonprofit.volunteer.VolunteerView;
@@ -35,16 +37,20 @@ public class App {
         for (Attendee attendee : store.listAttendees()) {
             attendee.takeNewNotes();
         }
-        console.println(">> Sample data loaded: " + store.getDonationService().listDonors().size() + " donors, "
+        console.println(">> Sample data loaded: " + store.getDonationService().getDonors().size() + " donors, "
                 + store.getVolunteerService().listVolunteers().size() + " volunteers, "
                 + store.getEventService().listEvents().size() + " events, "
                 + store.getBeneficiaryService().listBeneficiaries().size() + " beneficiaries.");
 
-        // One Scanner for both screens, so neither swallows the other's input.
+        // One Scanner for all screens, so none swallows another's input.
+        // The module screens are made after the sample data, so their notifications start now.
         Scanner in = new Scanner(System.in);
+        DonationController donationScreen = new DonationController(
+                store.getDonationService(), new DonationView(in), true,
+                store.getCommunicationService()::takeOutput);
         VolunteerController volunteerScreen = new VolunteerController(
                 store.getVolunteerService(), new VolunteerView(in, console), true,
                 store.getCommunicationService()::takeOutput);
-        new MainMenuController(store, new MainMenuView(in, console), volunteerScreen).run();
+        new MainMenuController(store, new MainMenuView(in, console), donationScreen, volunteerScreen).run();
     }
 }
