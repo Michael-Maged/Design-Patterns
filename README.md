@@ -11,9 +11,9 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 | 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory Method, Template Method | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
-| 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` (to generate) | **Done** |
+| 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | [`output/beneficiary.puml`](output/beneficiary.puml) | **Done** |
 | 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer | [`output/communication.puml`](output/communication.puml) | **Done** |
-| 6 | _TBD_ | `org.nonprofit.core` + `App` | Data store, event bus, system facade, console menu, overall diagram, requirements doc | Singleton, Observer, Facade | [`output/core.puml`](output/core.puml), `output/overall.puml` | Foundation in place* |
+| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App` | Data store, event bus, system facade, console menu, overall diagram, requirements doc | Singleton, Observer, Facade, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
 
 \* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`.
 
@@ -53,7 +53,7 @@ Other features: volunteer profiles (skills, available days, preferred task categ
 | **Strategy** | `AllocationStrategy`, `UrgencyFirstAllocation`, `FirstComeFirstServedAllocation`, `EqualShareAllocation`, `AllocationMode` | When stock is limited, `BeneficiaryService` asks its current strategy how to share it between the open needs of one category. It can be swapped at runtime (or chosen from user input such as `"equal"`), so the same stock can go to different people. `preview(...)` shows the result without handing anything out. |
 | **Template Method** | `ImpactReport`, `ProgramImpactReport`, `BeneficiaryProgressReport` | `ImpactReport.generate()` is final and always runs collect data, compute metrics, format rows, summary, footer. A program report shows what one program handed out and how many needs it fully met; a progress report shows one beneficiary's needs, met and open. A report with no data is refused with an `IllegalStateException`. |
 
-Other features: needs counted in units, so they cover both resources (food parcels) and services (counselling sessions); distributions can never exceed what is still needed; services given directly to one person (`giveDirectly`); and records with history cannot be removed. A HIGH-urgency need is published on the `EventBus` as `URGENT_NEED` (extended requirement 5) to the urgent responders set with `setUrgentResponders(Audience)`. The Facade passes the volunteers there, so this module never imports the Volunteers package. Each distribution is published as `RESOURCE_DISTRIBUTED` to the beneficiary. `BeneficiaryService` is the module's entry point and is what the Facade will call.
+Other features: needs counted in units, so they cover both resources (food parcels) and services (counselling sessions); distributions can never exceed what is still needed; services given directly to one person (`giveDirectly`); and records with history cannot be removed. A HIGH-urgency need is published on the `EventBus` as `URGENT_NEED` (extended requirement 5) to the urgent responders set with `setUrgentResponders(Audience)`. `DataStore` passes the volunteers there when it starts up, so this module never imports the Volunteers package. Each distribution is published as `RESOURCE_DISTRIBUTED` to the beneficiary. `BeneficiaryService` is the module's entry point and is what the Facade will call.
 
 ## Communication module (Student 5)
 
@@ -65,12 +65,26 @@ Other features: needs counted in units, so they cover both resources (food parce
 
 Other features: SMS cut to 160 characters, a communication log (`getLog()`), and `broadcast(...)` for manual sends.
 
+## Core and main menu (Student 6)
+
+The new classes live in `org.nonprofit.app`, not in `core`. They have to import every module, and every module imports `core`, so putting them in `core` would make the packages depend on each other. Dependencies only point down: `app` → modules → `core`.
+
+| Pattern | Where | What it does |
+|---|---|---|
+| **Singleton** | `DataStore` | Lazily created, thread-safe single instance that owns the one copy of each module service. `CommunicationService` is created only here, so no message is sent twice. It also passes the volunteers to `BeneficiaryService` as the urgent responders. A small attendee registry lives here too, so the menu can pick people for events. |
+| **Facade** | `NonProfitFacade` | The single entry point the main menu calls. Simple methods for every module (record a donation, assign a task, register an attendee with add-ons, distribute stock, broadcast to a group, ...) that delegate to the services from `DataStore`. |
+| **MVC** | `MainMenuView` (view), `MainMenuController` (controller), the module services (model) | Main menu with 1 Donations, 2 Volunteers, 3 Events, 4 Beneficiaries, 5 Communication. Volunteers opens the existing `VolunteerController` screen on the shared service. Results start with `>>`, errors with `!!`, and bad input never ends the program. |
+
+`App` loads sample data (`SampleData`) and opens the main menu. `App --demo` runs `SystemDemo`, a fixed walkthrough through the facade that shows every pattern in the system, with the same output on every run.
+
 ## Running
 
 From the `SDP` folder:
 
 ```sh
 javac --release 17 -d bin $(find src -name "*.java")
+java -cp bin App            # main menu (whole system)
+java -cp bin App --demo     # scripted walkthrough of every module and pattern
 java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
 java -cp bin org.nonprofit.volunteer.VolunteerApp
@@ -79,7 +93,7 @@ java -cp bin org.nonprofit.communication.CommunicationDemo
 java -cp bin org.nonprofit.beneficiary.BeneficiaryDemo
 ```
 
-In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` opens the interactive Volunteers screen; the `...Demo` classes run a fixed walkthrough.
+In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` opens the interactive Volunteers screen; the `...Demo` classes run a fixed walkthrough.
 
 ## Diagrams
 

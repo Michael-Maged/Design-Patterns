@@ -1,17 +1,13 @@
 package org.nonprofit.communication;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
+import org.nonprofit.core.Audience;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.Person;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
-import org.nonprofit.event.Attendee;
-import org.nonprofit.event.Event;
-import org.nonprofit.event.EventService;
-import org.nonprofit.event.EventType;
 
 /**
  * Stand-alone walkthrough of the Communication module, showing each pattern.
@@ -57,15 +53,14 @@ public class CommunicationDemo {
         bus.publish(new SystemEvent(SystemEventType.VOLUNTEER_ASSIGNED,
                 "You are assigned to Pack food boxes on SATURDAY", karim, null));
 
-        heading("5. OBSERVER - an event update reaches every attendee (audience)");
-        EventService events = new EventService();
-        LocalDateTime start = LocalDateTime.of(2026, 11, 20, 18, 0);
-        Event workshop = events.createEvent(EventType.WORKSHOP, "First Aid Basics", start, "Room 4B", 10);
-        Attendee mona = new Attendee("Mona Hassan", "mona@example.org", "+20100000001", ContactPreference.EMAIL);
-        Attendee omar = new Attendee("Omar Khaled", "omar@example.org", "+20100000002", ContactPreference.SMS);
-        events.register(workshop.getId(), mona);
-        events.register(workshop.getId(), omar);
-        workshop.relocate("Room 7A");
+        heading("5. OBSERVER - a message with no recipient reaches its source's whole audience");
+        // Any source that implements core.Audience works (in the real system it is an Event).
+        // A stand-in is used here so this module never depends on the Events package.
+        Person mona = new Contact("P-5", "Mona Hassan", "mona@example.org", "+20100000001", ContactPreference.EMAIL);
+        Person omar = new Contact("P-6", "Omar Khaled", "omar@example.org", "+20100000002", ContactPreference.SMS);
+        Audience workshopAttendees = () -> List.of(mona, omar);
+        bus.publish(new SystemEvent(SystemEventType.EVENT_UPDATED,
+                "First Aid Basics moved from Room 4B to Room 7A", null, workshopAttendees));
 
         heading("6. Communication log");
         comms.getLog().forEach(entry -> System.out.println("  " + entry));
