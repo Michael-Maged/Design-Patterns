@@ -11,6 +11,16 @@ import org.nonprofit.core.Person;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 import org.nonprofit.core.SystemObserver;
+import org.nonprofit.beneficiary.strategy.AllocationMode;
+import org.nonprofit.beneficiary.strategy.AllocationStrategy;
+import org.nonprofit.beneficiary.model.Beneficiary;
+import org.nonprofit.beneficiary.model.BeneficiaryService;
+import org.nonprofit.beneficiary.model.Distribution;
+import org.nonprofit.beneficiary.strategy.EqualShareAllocation;
+import org.nonprofit.beneficiary.strategy.FirstComeFirstServedAllocation;
+import org.nonprofit.beneficiary.model.Need;
+import org.nonprofit.beneficiary.model.Urgency;
+import org.nonprofit.beneficiary.strategy.UrgencyFirstAllocation;
 
 /**
  * Stand-alone walkthrough of the Beneficiaries module, showing each pattern.

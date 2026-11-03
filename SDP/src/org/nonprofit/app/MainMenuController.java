@@ -1,9 +1,9 @@
 package org.nonprofit.app;
 
-import org.nonprofit.beneficiary.BeneficiaryController;
+import org.nonprofit.beneficiary.mvc.BeneficiaryController;
 import org.nonprofit.communication.CommunicationController;
-import org.nonprofit.donation.DonationController;
-import org.nonprofit.event.EventController;
+import org.nonprofit.donation.mvc.DonationController;
+import org.nonprofit.event.mvc.EventController;
 import org.nonprofit.volunteer.VolunteerController;
 
 /**

@@ -17,6 +17,16 @@ The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-sys
 
 \* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`. `Person.updateContact(...)` lets every module edit a person's name and contact details (the ID never changes, and a blank name is refused).
 
+**Source layout: one folder per pattern.** In the Donations, Events and Beneficiaries modules, every design pattern's classes sit together in their own sub-package; the screen is in `mvc`, the service and its data in `model`, and the module's demo / runner stays at the module root:
+
+| Module | `mvc` | `model` | Pattern folders |
+|---|---|---|---|
+| `donation` | Controller, View | Service, Donor, Campaign, DonationForm, DonationType | `factorymethod` (creators + Donation products), `templatemethod` (DonationDocument, DonationReceipt, TaxStatement) |
+| `event` | Controller, View | Service, RegistrationResult, WaitlistEntry | `simplefactory` (EventFactory, EventType, Fundraiser, Workshop, OutreachProgram), `observer` (EventSubject, Event, EventObserver, EventChange, Attendee, EventBusNotifier), `decorator` (Ticket … TicketAddOn) |
+| `beneficiary` | Controller, View | Service, Beneficiary, Need, Urgency, Distribution | `strategy` (AllocationStrategy + 3 rules, AllocationMode), `templatemethod` (ImpactReport + 2) |
+
+`volunteer`, `communication`, `app` and `core` keep their flat layout. Each of these folders has its own class diagram in `output/<module>/<folder>.puml` (e.g. `output/event/observer.puml`), and `output/donation.puml`, `output/event.puml` and `output/beneficiary.puml` show all of a module's folders together. Because Java's package-private access stops at a package boundary, a few members that one folder's classes call from another are now `public` (e.g. `Event`'s registration bookkeeping, used by `EventService`; `Donor.addDonation`, used by `DonationCreator`). Their comments say who is meant to call them.
+
 **Observer names.** The Observer code uses the lecture's names. In the Events module, `EventSubject` is the Subject interface (`registerObserver`, `removeObserver`), `Event` implements it and calls its protected `notifyObservers(...)`, and `EventObserver.update(...)` is the Observer. The system-wide `EventBus` keeps the shorter names `subscribe` / `unsubscribe` / `publish`, which are the lecture's `registerObserver` / `removeObserver` / `notifyObservers`; `SystemObserver.onEvent(...)` is `update()`.
 
 **Model classes don't print (MVC).** Services and model classes return text instead of printing it. Channels return what they delivered, `CommunicationService` keeps it in an outbox until a view calls `takeOutput()`, and an `Attendee` stores its notes until a view calls `takeNewNotes()`. Only the views (`MainMenuView` and the five module views), `App` and the demo classes print.

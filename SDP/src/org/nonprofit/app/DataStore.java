@@ -2,12 +2,12 @@ package org.nonprofit.app;
 
 import java.util.List;
 
-import org.nonprofit.beneficiary.BeneficiaryService;
+import org.nonprofit.beneficiary.model.BeneficiaryService;
 import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.core.Audience;
 import org.nonprofit.core.Person;
-import org.nonprofit.donation.DonationService;
-import org.nonprofit.event.EventService;
+import org.nonprofit.donation.model.DonationService;
+import org.nonprofit.event.model.EventService;
 import org.nonprofit.volunteer.VolunteerService;
 
 /**
