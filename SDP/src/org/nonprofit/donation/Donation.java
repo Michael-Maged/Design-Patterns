@@ -3,65 +3,57 @@ package org.nonprofit.donation;
 import java.time.LocalDate;
 
 /**
- * What every donation has in common: who gave it, how much, and when.
- * For an in-kind donation (goods) the amount is the estimated value of the goods.
+ * Base class for all donations. {@code value} is the money given, or the
+ * estimated value of goods for an in-kind donation.
  *
- * The class is abstract because a donation is always one of the concrete
- * types (online, check or in-kind). Those objects are built by the
- * DonationCreator subclasses (Factory Method pattern).
+ * FACTORY METHOD pattern (product). Concrete types are created only by the
+ * {@link DonationProcessor} subclasses.
  */
 public abstract class Donation {
     private final String id;
     private final Donor donor;
-    private final double amount;
+    private final double value;
     private final LocalDate date;
-    private Campaign campaign; // null when the donation is not for a campaign
+    private final String campaign;
 
-    protected Donation(String id, Donor donor, double amount, LocalDate date) {
+    protected Donation(String id, Donor donor, double value, LocalDate date, String campaign) {
         if (donor == null) {
             throw new IllegalArgumentException("Donor is required");
         }
-        // Double.isNaN is needed because NaN is not caught by "amount <= 0".
-        if (Double.isNaN(amount) || amount <= 0) {
-            throw new IllegalArgumentException("Donation amount must be more than zero");
+        // NaN ("not a number") would slip past "value <= 0", so it is checked too.
+        if (Double.isNaN(value) || value <= 0) {
+            throw new IllegalArgumentException("Donation amount must be a positive number");
         }
         if (date == null) {
             throw new IllegalArgumentException("Donation date is required");
         }
         this.id = id;
         this.donor = donor;
-        this.amount = amount;
+        this.value = value;
         this.date = date;
-    }
-
-    /** Each subclass says which type it is. */
-    public abstract DonationType getType();
-
-    /** Each subclass describes its own extra info (payment ref, check number, item...). */
-    public abstract String getDetails();
-
-    public String getId() { return id; }
-    public Donor getDonor() { return donor; }
-    public double getAmount() { return amount; }
-    public LocalDate getDate() { return date; }
-    public Campaign getCampaign() { return campaign; }
-
-    void setCampaign(Campaign campaign) {
         this.campaign = campaign;
     }
 
-    /** Formats money the same way everywhere in the module, e.g. $1,250.00 */
-    public static String money(double amount) {
-        return String.format("$%,.2f", amount);
+    public abstract DonationType getType();
+
+    /** Type-specific information shown on summaries and receipts. */
+    public abstract String details();
+
+    public String getId() { return id; }
+    public Donor getDonor() { return donor; }
+    public double getValue() { return value; }
+    public LocalDate getDate() { return date; }
+    /** The campaign this donation counts towards, or null. */
+    public String getCampaign() { return campaign; }
+
+    public String summary() {
+        return String.format("%s [%s] %s | %s on %s | %s%s",
+                id, getType(), donor.getName(), DonationDocument.money(value), date, details(),
+                campaign == null ? "" : " | campaign: " + campaign);
     }
 
     @Override
     public String toString() {
-        String text = id + " | " + getType() + " | " + donor.getName() + " | " + money(amount)
-                + " | " + date + " | " + getDetails();
-        if (campaign != null) {
-            text += " | campaign: " + campaign.getName();
-        }
-        return text;
+        return getType() + " donation " + id;
     }
 }

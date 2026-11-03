@@ -2,24 +2,19 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** Money paid with a paper check. We keep the check number and the bank for our records. */
+/** A donation paid by check. */
 public class CheckDonation extends Donation {
     private final String checkNumber;
     private final String bankName;
 
-    CheckDonation(String id, Donor donor, double amount, LocalDate date,
+    CheckDonation(String id, Donor donor, double amount, LocalDate date, String campaign,
                   String checkNumber, String bankName) {
-        super(id, donor, amount, date);
+        super(id, donor, amount, date, campaign);
         if (checkNumber == null || checkNumber.isBlank()) {
             throw new IllegalArgumentException("Check donations need a check number");
         }
         this.checkNumber = checkNumber;
-        // The bank is nice to have but not required.
-        if (bankName == null || bankName.isBlank()) {
-            this.bankName = "unknown bank";
-        } else {
-            this.bankName = bankName;
-        }
+        this.bankName = bankName == null || bankName.isBlank() ? "unknown bank" : bankName;
     }
 
     @Override
@@ -27,11 +22,11 @@ public class CheckDonation extends Donation {
         return DonationType.CHECK;
     }
 
-    @Override
-    public String getDetails() {
-        return "check #" + checkNumber + " from " + bankName;
-    }
-
     public String getCheckNumber() { return checkNumber; }
     public String getBankName() { return bankName; }
+
+    @Override
+    public String details() {
+        return "check #" + checkNumber + ", " + bankName;
+    }
 }
