@@ -2,7 +2,7 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** FACTORY METHOD pattern (concrete creator): builds {@link OnlineDonation}s. */
+/** FACTORY METHOD pattern - ConcreteCreator: its factory method builds {@link OnlineDonation}s. */
 public class OnlineDonationProcessor extends DonationProcessor {
 
     @Override

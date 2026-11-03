@@ -34,17 +34,21 @@ public class CommunicationDemo {
         for (Person p : List.of(nadia, karim, hana)) {
             comms.send(p, "Hello", "Thanks for supporting our winter drive.", false, null);
         }
+        show(comms);
         System.out.println("  Prefers SMS but has no phone or e-mail, so the selector falls back to social media:");
         comms.send(ghost, "Hello", "Thanks for supporting our winter drive.", false, null);
+        show(comms);
 
         heading("2. STRATEGY - switching channel at runtime (everyone by SMS)");
         comms.broadcast(List.of(nadia, karim, hana), "Road closed", "Meet at the side gate today.", false,
                 ContactPreference.SMS);
+        show(comms);
 
         heading("3. DECORATOR - urgent tag, signature and footer stacked on the text");
         comms.send(nadia, "Urgent need", "We need blankets by Friday.", true, null);
         comms.send(hana, "Urgent need", "We need blankets by Friday.", true, null);
         comms.send(karim, "Urgent need", "We need blankets by Friday. Please bring any you can spare to the main hall tonight.", true, null);
+        show(comms);
 
         heading("4. OBSERVER - system events on the EventBus become messages");
         EventBus bus = EventBus.getInstance();
@@ -52,6 +56,7 @@ public class CommunicationDemo {
                 "Thank you for your ONLINE donation of $250.00", nadia, null));
         bus.publish(new SystemEvent(SystemEventType.VOLUNTEER_ASSIGNED,
                 "You are assigned to Pack food boxes on SATURDAY", karim, null));
+        show(comms);
 
         heading("5. OBSERVER - a message with no recipient reaches its source's whole audience");
         // Any source that implements core.Audience works (in the real system it is an Event).
@@ -61,9 +66,15 @@ public class CommunicationDemo {
         Audience workshopAttendees = () -> List.of(mona, omar);
         bus.publish(new SystemEvent(SystemEventType.EVENT_UPDATED,
                 "First Aid Basics moved from Room 4B to Room 7A", null, workshopAttendees));
+        show(comms);
 
         heading("6. Communication log");
         comms.getLog().forEach(entry -> System.out.println("  " + entry));
+    }
+
+    /** The service prints nothing; the demo (the view here) prints what it delivered. */
+    private static void show(CommunicationService comms) {
+        comms.takeOutput().forEach(System.out::println);
     }
 
     private static void heading(String text) {

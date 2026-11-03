@@ -13,7 +13,13 @@ public class Donor extends Person {
     private final List<Donation> donations = new ArrayList<>();
 
     public Donor(String name, String email, String phone, ContactPreference preferredContact) {
-        super("DNR-" + nextId++, name, email, phone, preferredContact);
+        super(takeId(name), name, email, phone, preferredContact);
+    }
+
+    /** Checks the name before taking a number, so a rejected donor does not use one up. */
+    private static String takeId(String name) {
+        requireName(name);
+        return "DNR-" + nextId++;
     }
 
     /** Donors are thanked by e-mail unless they ask otherwise. */

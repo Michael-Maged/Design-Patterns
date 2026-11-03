@@ -6,8 +6,8 @@ import java.time.LocalDate;
  * Base class for all donations. {@code value} is the money given, or the
  * estimated value of goods for an in-kind donation.
  *
- * FACTORY METHOD pattern (product). Concrete types are created only by the
- * {@link DonationProcessor} subclasses.
+ * FACTORY METHOD pattern - Product. The concrete products are created only by
+ * the {@link DonationProcessor} subclasses (the concrete creators).
  */
 public abstract class Donation {
     private final String id;
@@ -20,8 +20,8 @@ public abstract class Donation {
         if (donor == null) {
             throw new IllegalArgumentException("Donor is required");
         }
-        // NaN ("not a number") would slip past "value <= 0", so it is checked too.
-        if (Double.isNaN(value) || value <= 0) {
+        // NaN ("not a number") and Infinity would slip past "value <= 0", so they are checked too.
+        if (!Double.isFinite(value) || value <= 0) {
             throw new IllegalArgumentException("Donation amount must be a positive number");
         }
         if (date == null) {

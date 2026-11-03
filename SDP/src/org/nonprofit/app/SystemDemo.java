@@ -1,43 +1,70 @@
 package org.nonprofit.app;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 
+import org.nonprofit.beneficiary.AllocationMode;
+import org.nonprofit.beneficiary.Beneficiary;
+import org.nonprofit.beneficiary.BeneficiaryService;
 import org.nonprofit.beneficiary.Need;
+import org.nonprofit.beneficiary.Urgency;
+import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.communication.SentMessage;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.donation.Donation;
 import org.nonprofit.donation.DonationDetails;
+import org.nonprofit.donation.DonationService;
 import org.nonprofit.donation.Donor;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.event.Event;
+import org.nonprofit.event.EventService;
 import org.nonprofit.event.RegistrationResult;
+import org.nonprofit.event.TicketAddOn;
+import org.nonprofit.volunteer.AssignmentMode;
 import org.nonprofit.volunteer.Task;
 import org.nonprofit.volunteer.Volunteer;
+import org.nonprofit.volunteer.VolunteerController;
+import org.nonprofit.volunteer.VolunteerService;
+import org.nonprofit.volunteer.VolunteerView;
 
 /**
  * The scripted, non-interactive walkthrough run by {@code App --demo}.
- * Every step goes through the {@link NonProfitFacade} and prints evidence of
- * each pattern: Singleton, Factory, Strategy, Decorator, Observer, Template
- * Method and Facade. Dates are fixed, so the output is the same every run.
+ * Every step calls the module services from the {@link DataStore} and prints
+ * evidence of each pattern: Singleton, Factory / Factory Method, Strategy,
+ * Decorator, Observer, Template Method and, last, MVC (the main menu driven
+ * by scripted input). Dates are fixed, so the output is the same every run.
+ * The model classes print nothing: after each step the demo prints what
+ * Communication sent and the attendees' new inbox notes ({@link #show()}).
  */
 public final class SystemDemo {
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 1);
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 1, 9, 0);
 
-    private final NonProfitFacade facade;
+    private final DataStore store;
+    private final DonationService donations;
+    private final VolunteerService volunteers;
+    private final EventService events;
+    private final BeneficiaryService beneficiaries;
+    private final CommunicationService communication;
     private int section;
 
-    private SystemDemo(NonProfitFacade facade) {
-        this.facade = facade;
+    private SystemDemo(DataStore store) {
+        this.store = store;
+        this.donations = store.getDonationService();
+        this.volunteers = store.getVolunteerService();
+        this.events = store.getEventService();
+        this.beneficiaries = store.getBeneficiaryService();
+        this.communication = store.getCommunicationService();
     }
 
-    public static void run(NonProfitFacade facade) {
-        new SystemDemo(facade).walkthrough();
+    public static void run(DataStore store) {
+        new SystemDemo(store).walkthrough();
     }
 
     private void walkthrough() {
@@ -47,7 +74,7 @@ public final class SystemDemo {
         events();
         beneficiaries();
         communication();
-        summary();
+        mvc();
     }
 
     // ---- Singleton ----
@@ -68,188 +95,231 @@ public final class SystemDemo {
 
     private void donations() {
         heading("FACTORY METHOD - donations created from text; OBSERVER sends the thank-you");
-        Donor hany = facade.registerDonor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL);
-        Donor rania = facade.registerDonor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS);
-        Donor bakery = facade.registerDonor("El Nour Bakery", "orders@elnour.example", "+20120000003",
-                ContactPreference.EMAIL);
-        facade.createCampaign("Winter Blankets", 15_000);
+        Donor hany = donations.registerDonor(
+                new Donor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL));
+        Donor rania = donations.registerDonor(
+                new Donor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS));
+        Donor bakery = donations.registerDonor(
+                new Donor("El Nour Bakery", "orders@elnour.example", "+20120000003", ContactPreference.EMAIL));
+        donations.createCampaign("Winter Blankets", 15_000);
 
         int before = logSize();
-        Donation online = facade.recordDonation(hany.getId(), "online", TODAY.minusMonths(9),
+        Donation online = donations.recordDonation(hany.getId(), "online", TODAY.minusMonths(9),
                 DonationDetails.of(500).reference("PAY-88213").recurring());
-        Donation check = facade.recordDonation(rania.getId(), "check", TODAY.minusMonths(2),
+        Donation check = donations.recordDonation(rania.getId(), "check", TODAY.minusMonths(2),
                 DonationDetails.of(2_000).reference("004517").bank("National Bank of Egypt").campaign("Winter Blankets"));
-        Donation goods = facade.recordDonation(bakery.getId(), "in-kind", TODAY.minusDays(5),
+        Donation goods = donations.recordDonation(bakery.getId(), "in-kind", TODAY.minusDays(5),
                 DonationDetails.of(1_200).item("300 loaves of bread for the food drive"));
-        facade.recordDonation(hany.getId(), "online", TODAY.minusDays(1),
+        donations.recordDonation(hany.getId(), "online", TODAY.minusDays(1),
                 DonationDetails.of(4_500).reference("PAY-90410").campaign("winter blankets"));
         sent(before, 4);
         for (Donation d : List.of(online, check, goods)) {
             System.out.println("  text -> " + d.getClass().getSimpleName() + ": " + d.summary());
         }
         try {
-            facade.recordDonation(hany.getId(), "crypto", TODAY, DonationDetails.of(10));
+            donations.recordDonation(hany.getId(), "crypto", TODAY, DonationDetails.of(10));
         } catch (IllegalArgumentException e) {
             System.out.println("  Rejected: " + e.getMessage());
         }
 
         heading("TEMPLATE METHOD - a receipt and a tax statement share one layout");
-        System.out.println(facade.receipt(online.getId(), TODAY));
-        System.out.println(facade.taxStatement(hany.getId(), 2026, TODAY));
-        System.out.println(facade.donationSummary());
+        System.out.println(donations.receipt(online.getId(), TODAY));
+        System.out.println(donations.taxStatement(hany.getId(), 2026, TODAY));
+        System.out.println(MainMenuController.donationSummary(donations, 3));
     }
 
     // ---- Volunteers ----
 
     private void volunteers() {
         heading("STRATEGY - swapping the assignment rule changes who gets the task");
-        Volunteer sara = facade.registerVolunteer("Sara Mostafa", "sara@example.org", "+20110000001",
-                ContactPreference.EMAIL, List.of("first aid", "teaching"),
-                List.of(DayOfWeek.MONDAY, DayOfWeek.SATURDAY), List.of("health"));
-        Volunteer karim = facade.registerVolunteer("Karim Fathy", "karim@example.org", "+20110000002",
-                ContactPreference.SMS, List.of("first aid", "driving"),
-                List.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY), List.of("logistics"));
-        facade.registerVolunteer("Nour Adel", "nour@example.org", "+20110000003",
-                ContactPreference.SMS, List.of("cooking"), List.of(DayOfWeek.SATURDAY), List.of("food"));
+        Volunteer sara = volunteers.registerVolunteer(new Volunteer("Sara Mostafa", "sara@example.org",
+                "+20110000001", ContactPreference.EMAIL).addSkill("first aid").addSkill("teaching")
+                .addAvailability(DayOfWeek.MONDAY, DayOfWeek.SATURDAY).addPreference("health"));
+        Volunteer karim = volunteers.registerVolunteer(new Volunteer("Karim Fathy", "karim@example.org",
+                "+20110000002", ContactPreference.SMS).addSkill("first aid").addSkill("driving")
+                .addAvailability(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY).addPreference("logistics"));
+        volunteers.registerVolunteer(new Volunteer("Nour Adel", "nour@example.org", "+20110000003",
+                ContactPreference.SMS).addSkill("cooking").addAvailability(DayOfWeek.SATURDAY).addPreference("food"));
 
         System.out.println("  Some history first (each assignment is sent to the volunteer):");
-        Task delivery = facade.addTask("Delivery run", "driving", DayOfWeek.SUNDAY, "logistics", "Neighbourhood Food Drive");
-        Task reading = facade.addTask("Reading class", "teaching", DayOfWeek.MONDAY, "education", null);
-        facade.assignTask(delivery.getId());
-        facade.logHours(delivery.getId(), 6, TODAY.minusDays(7));
-        facade.assignTask(reading.getId());
-        facade.logHours(reading.getId(), 3, TODAY.minusDays(6));
-        facade.assignTask(facade.addTask("Van driver", "driving", DayOfWeek.SUNDAY, "logistics", null).getId());
-        facade.assignTask(facade.addTask("Tutor", "teaching", DayOfWeek.MONDAY, "education", null).getId());
+        Task delivery = addTask("Delivery run", "driving", DayOfWeek.SUNDAY, "logistics", "Neighbourhood Food Drive");
+        Task reading = addTask("Reading class", "teaching", DayOfWeek.MONDAY, "education", null);
+        volunteers.assign(delivery.getId());
+        volunteers.logHours(delivery.getId(), 6, TODAY.minusDays(7));
+        volunteers.assign(reading.getId());
+        volunteers.logHours(reading.getId(), 3, TODAY.minusDays(6));
+        volunteers.assign(addTask("Van driver", "driving", DayOfWeek.SUNDAY, "logistics", null).getId());
+        volunteers.assign(addTask("Tutor", "teaching", DayOfWeek.MONDAY, "education", null).getId());
+        show();
 
-        Task tent = facade.addTask("Medical tent", "first aid", DayOfWeek.SATURDAY, "health", "Neighbourhood Food Drive");
+        Task tent = addTask("Medical tent", "first aid", DayOfWeek.SATURDAY, "health", "Neighbourhood Food Drive");
         System.out.println("  " + tent.summary());
         for (String rule : List.of("skill", "availability", "preference")) {
-            String name = facade.setAssignmentRule(rule);
-            System.out.printf("  %-52s -> %s%n", name, nameOf(facade.suggestVolunteer(tent.getId())));
+            volunteers.setStrategy(AssignmentMode.fromString(rule));
+            System.out.printf("  %-52s -> %s%n", volunteers.getStrategy().name(),
+                    nameOf(volunteers.suggest(tent.getId())));
         }
-        System.out.println("  Assigned with the preference rule: " + nameOf(facade.assignTask(tent.getId())));
-        facade.logHours(tent.getId(), 5, TODAY.plusDays(6));
+        Volunteer chosen = volunteers.assign(tent.getId());
+        show();
+        System.out.println("  Assigned with the preference rule: " + nameOf(chosen));
+        volunteers.logHours(tent.getId(), 5, TODAY.plusDays(6));
 
         heading("TEMPLATE METHOD - leaderboard and certificates");
-        System.out.println(facade.leaderboard(3));
-        System.out.println(facade.hoursCertificate(karim.getId(), TODAY.plusDays(7)));
-        System.out.println(facade.participationCertificate(sara.getId(), "Neighbourhood Food Drive", TODAY.plusDays(7)));
+        System.out.println(volunteers.leaderboardReport(3));
+        System.out.println(volunteers.issueHoursCertificate(karim.getId(), TODAY.plusDays(7)));
+        System.out.println(volunteers.issueParticipationCertificate(sara.getId(), "Neighbourhood Food Drive",
+                TODAY.plusDays(7)));
     }
 
     // ---- Events ----
 
     private void events() {
         heading("FACTORY - events created from text");
-        Event gala = facade.createEvent("fundraiser", "Winter Charity Gala", NOW.plusDays(10).withHour(19),
+        Event gala = events.createEvent("fundraiser", "Winter Charity Gala", NOW.plusDays(10).withHour(19),
                 "Grand Hall", 100);
-        Event workshop = facade.createEvent("workshop", "First Aid Basics", NOW.plusHours(8), "Room 4B", 2);
-        Event drive = facade.createEvent("outreach program", "Neighbourhood Food Drive", NOW.plusDays(3),
+        Event workshop = events.createEvent("workshop", "First Aid Basics", NOW.plusHours(8), "Room 4B", 2);
+        Event drive = events.createEvent("outreach program", "Neighbourhood Food Drive", NOW.plusDays(3),
                 "Community Center", 50);
-        for (Event e : facade.listEvents()) {
+        for (Event e : events.listEvents()) {
             System.out.println("  text -> " + e.getClass().getSimpleName() + ": " + e.summary());
         }
 
         heading("DECORATOR - ticket add-ons stack on the price; a full event uses the waitlist");
-        Attendee mona = facade.addAttendee("Mona Hassan", "mona@example.org", "+20100000001", ContactPreference.EMAIL);
-        Attendee omar = facade.addAttendee("Omar Khaled", "omar@example.org", "+20100000002", ContactPreference.SMS);
-        Attendee laila = facade.addAttendee("Laila Samir", "laila@example.org", "+20100000003", ContactPreference.EMAIL);
-        Attendee youssef = facade.addAttendee("Youssef Ali", "youssef@example.org", "+20100000004", ContactPreference.SMS);
-        register(gala, mona, List.of());
-        register(gala, omar, List.of("vip"));
-        register(gala, laila, List.of("vip", "meal", "parking"));
+        Attendee mona = addAttendee("Mona Hassan", "mona@example.org", "+20100000001", ContactPreference.EMAIL);
+        Attendee omar = addAttendee("Omar Khaled", "omar@example.org", "+20100000002", ContactPreference.SMS);
+        Attendee laila = addAttendee("Laila Samir", "laila@example.org", "+20100000003", ContactPreference.EMAIL);
+        Attendee youssef = addAttendee("Youssef Ali", "youssef@example.org", "+20100000004", ContactPreference.SMS);
+        register(gala, mona);
+        register(gala, omar, TicketAddOn.VIP);
+        register(gala, laila, TicketAddOn.VIP, TicketAddOn.MEAL, TicketAddOn.PARKING);
         System.out.println("  The workshop holds 2:");
-        register(workshop, mona, List.of("meal"));
-        register(workshop, omar, List.of());
-        register(workshop, youssef, List.of());
+        register(workshop, mona, TicketAddOn.MEAL);
+        register(workshop, omar);
+        register(workshop, youssef);
         System.out.println("  Omar cancels the workshop, so Youssef is promoted from the waitlist:");
-        facade.cancelRegistration(workshop.getId(), omar.getId());
+        events.cancelRegistration(workshop.getId(), omar);
+        show();
 
         heading("OBSERVER - changes and reminders reach every attendee");
         int before = logSize();
-        facade.rescheduleEvent(gala.getId(), gala.getDateTime().plusDays(1));
+        events.reschedule(gala.getId(), gala.getDateTime().plusDays(1));
         sent(before, 3);
-        List<Event> reminded = facade.sendUpcomingReminders(NOW, 24);
+        List<Event> reminded = events.sendUpcomingReminders(NOW, Duration.ofHours(24));
+        show();
         System.out.println("  Reminded: " + reminded);
-        facade.checkIn(gala.getId(), mona.getId());
-        facade.checkIn(gala.getId(), laila.getId());
-        System.out.println(facade.attendanceReport(gala.getId()));
-        facade.registerAttendee(drive.getId(), youssef.getId(), List.of());
-        facade.cancelEvent(drive.getId());
+        events.checkIn(gala.getId(), mona);
+        events.checkIn(gala.getId(), laila);
+        System.out.println(events.attendanceReport(gala.getId()));
+        events.register(drive.getId(), youssef, NOW);
+        events.cancelEvent(drive.getId());
+        show();
     }
 
     // ---- Beneficiaries ----
 
     private void beneficiaries() {
         heading("OBSERVER - a HIGH need reaches every volunteer (Audience wired by DataStore)");
-        String amal = facade.registerBeneficiary("Amal Saeed", null, "+20120000011", ContactPreference.SMS,
-                "Ard El Lewa", 5).getId();
-        String hassan = facade.registerBeneficiary("Hassan Ali", "hassan@example.org", "+20120000012",
-                ContactPreference.EMAIL, "Imbaba", 2).getId();
-        String rania = facade.registerBeneficiary("Rania Youssef", null, "+20120000013", ContactPreference.SMS,
-                "Ard El Lewa", 4).getId();
-        facade.addNeed(amal, "food parcel", 4, "medium", TODAY.minusDays(9));
-        facade.addNeed(hassan, "food parcel", 3, "low", TODAY.minusDays(12));
+        String amal = beneficiaries.registerBeneficiary(new Beneficiary("Amal Saeed", null, "+20120000011",
+                ContactPreference.SMS, "Ard El Lewa", 5)).getId();
+        String hassan = beneficiaries.registerBeneficiary(new Beneficiary("Hassan Ali", "hassan@example.org",
+                "+20120000012", ContactPreference.EMAIL, "Imbaba", 2)).getId();
+        String rania = beneficiaries.registerBeneficiary(new Beneficiary("Rania Youssef", null, "+20120000013",
+                ContactPreference.SMS, "Ard El Lewa", 4)).getId();
+        beneficiaries.addNeed(amal, "food parcel", 4, Urgency.MEDIUM, TODAY.minusDays(9));
+        beneficiaries.addNeed(hassan, "food parcel", 3, Urgency.LOW, TODAY.minusDays(12));
         int before = logSize();
-        facade.addNeed(rania, "food parcel", 5, "high", TODAY.minusDays(2));
-        sent(before, facade.listVolunteers().size());
+        beneficiaries.addNeed(rania, "food parcel", 5, Urgency.HIGH, TODAY.minusDays(2));
+        sent(before, volunteers.listVolunteers().size());
 
         heading("STRATEGY - the same 6 food parcels under three allocation rules");
         for (String rule : List.of("urgency", "first come", "equal")) {
-            String name = facade.setAllocationRule(rule);
-            System.out.printf("  %-26s -> %s%n", name, describe(facade.previewDistribution("food parcel", 6)));
+            beneficiaries.setStrategy(AllocationMode.fromString(rule));
+            System.out.printf("  %-26s -> %s%n", beneficiaries.getStrategy().name(),
+                    describe(beneficiaries.preview("food parcel", 6)));
         }
         System.out.println("  Distributing with the equal-share rule:");
-        facade.distribute("Winter Food Program", "food parcel", 6, TODAY);
+        beneficiaries.distribute("Winter Food Program", "food parcel", 6, TODAY);
+        show();
 
         heading("TEMPLATE METHOD - two impact reports, one layout");
-        System.out.println(facade.programImpactReport("Winter Food Program", TODAY.plusDays(7)));
-        System.out.println(facade.progressReport(amal, TODAY.plusDays(7)));
+        System.out.println(beneficiaries.programImpactReport("Winter Food Program", TODAY.plusDays(7)));
+        System.out.println(beneficiaries.progressReport(amal, TODAY.plusDays(7)));
     }
 
     // ---- Communication ----
 
     private void communication() {
         heading("DECORATOR + STRATEGY - an urgent broadcast to all donors, then all volunteers by SMS");
-        int reached = facade.broadcast("donors", "Winter appeal", "We need blankets by Friday.", true, null);
+        int reached = communication.broadcast(store.membersOf(BroadcastGroup.fromString("donors")),
+                "Winter appeal", "We need blankets by Friday.", true, null);
+        show();
         System.out.println("  Reached " + reached + " donor(s), each on their own channel"
                 + " (urgent tag + signature + e-mail footer stacked on the text).");
-        reached = facade.broadcast(BroadcastGroup.VOLUNTEERS, "Road closed", "Meet at the side gate on Saturday.",
-                false, ContactPreference.SMS);
+        reached = communication.broadcast(store.membersOf(BroadcastGroup.VOLUNTEERS), "Road closed",
+                "Meet at the side gate on Saturday.", false, ContactPreference.SMS);
+        show();
         System.out.println("  Reached " + reached + " volunteer(s), all forced onto SMS.");
 
         heading("Message log (every message sent once)");
-        for (SentMessage m : facade.messageLog()) {
+        for (SentMessage m : communication.getLog()) {
             System.out.printf("  %-9s -> %-16s %s%n", m.getChannel(), m.getRecipient(), m.getSubject());
         }
     }
 
-    // ---- Facade ----
+    // ---- MVC ----
 
-    private void summary() {
-        heading("FACADE - everything above went through NonProfitFacade");
-        System.out.println("  " + facade.listDonors().size() + " donors, " + facade.listDonations().size()
-                + " donations, " + facade.listVolunteers().size() + " volunteers, "
-                + facade.listTasks().size() + " tasks, " + facade.listEvents().size() + " events, "
-                + facade.listAttendees().size() + " attendees, " + facade.listBeneficiaries().size()
-                + " beneficiaries, " + facade.messageLog().size() + " messages sent.");
+    /**
+     * Drives the real main menu with scripted input: the controller reads
+     * each choice from the view, asks the services (the model) and has the
+     * view print the answer. Only screens that do not depend on today's
+     * date are used, so the output stays the same on every run.
+     */
+    private void mvc() {
+        heading("MVC - the main menu (MainMenuController + MainMenuView) over the module services");
+        String typed = String.join("\n",
+                "1", "1", "0",        // Donations > List donors > Back
+                "abc",                // a bad choice is refused and the menu comes back
+                "0") + "\n";          // Exit
+        System.out.println("  Scripted input: " + typed.replace("\n", " ").trim());
+        Scanner in = new Scanner(typed);
+        VolunteerController volunteerScreen = new VolunteerController(volunteers,
+                new VolunteerView(in, System.out), true, communication::takeOutput);
+        new MainMenuController(store, new MainMenuView(in, System.out), volunteerScreen).run();
+
+        System.out.println();
+        System.out.println("  " + donations.listDonors().size() + " donors, " + donations.listDonations().size()
+                + " donations, " + volunteers.listVolunteers().size() + " volunteers, "
+                + volunteers.listTasks().size() + " tasks, " + events.listEvents().size() + " events, "
+                + store.listAttendees().size() + " attendees, " + beneficiaries.listBeneficiaries().size()
+                + " beneficiaries, " + communication.getLog().size() + " messages sent.");
     }
 
     // ---- Helpers ----
 
+    private Task addTask(String name, String skill, DayOfWeek day, String category, String eventName) {
+        return volunteers.addTask(new Task(name, skill, day, category, eventName));
+    }
+
+    private Attendee addAttendee(String name, String email, String phone, ContactPreference contact) {
+        return store.addAttendee(new Attendee(name, email, phone, contact));
+    }
+
     private int logSize() {
-        return facade.messageLog().size();
+        return communication.getLog().size();
     }
 
     /** Shows how many messages Communication sent since {@code before}, against how many were expected. */
     private void sent(int before, int expected) {
+        show();
         int count = logSize() - before;
         System.out.println("  CommunicationService sent " + count + " message(s); expected " + expected
                 + (count == expected ? " - no duplicates." : " - MISMATCH!"));
     }
 
-    private void register(Event event, Attendee attendee, List<String> addOns) {
-        RegistrationResult result = facade.registerAttendee(event.getId(), attendee.getId(), addOns);
+    /** Registers with the demo's fixed "now", so an event that has started would be refused. */
+    private void register(Event event, Attendee attendee, TicketAddOn... addOns) {
+        RegistrationResult result = events.register(event.getId(), attendee, NOW, addOns);
+        show();
         switch (result.status()) {
             case REGISTERED:
                 System.out.println("  REGISTERED  " + attendee.getName() + ": " + result.ticket());
@@ -259,6 +329,16 @@ public final class SystemDemo {
                 break;
             default:
                 System.out.println("  " + result.status() + "  " + attendee.getName());
+        }
+    }
+
+    /** The demo is the view: prints the messages sent and the inbox notes received since the last call. */
+    private void show() {
+        communication.takeOutput().forEach(System.out::println);
+        for (Attendee attendee : store.listAttendees()) {
+            for (String note : attendee.takeNewNotes()) {
+                System.out.println("    [inbox of " + attendee.getName() + "] " + note);
+            }
         }
     }
 

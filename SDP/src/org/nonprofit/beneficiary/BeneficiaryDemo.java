@@ -38,7 +38,7 @@ public class BeneficiaryDemo {
         BeneficiaryService service = new BeneficiaryService();
         LocalDate today = LocalDate.of(2026, 11, 1);
 
-        // In the full system the Facade passes VolunteerService's volunteers here.
+        // In the full system DataStore passes VolunteerService's volunteers here.
         List<Person> onCall = List.of(new Responder("Sara Mostafa"), new Responder("Karim Fathy"));
         service.setUrgentResponders(() -> onCall);
 

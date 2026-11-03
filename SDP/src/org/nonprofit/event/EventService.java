@@ -3,6 +3,7 @@ package org.nonprofit.event;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +14,7 @@ import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Events module (the Facade in core calls this).
+ * Entry point of the Events module (the main menu calls this).
  * Creates events through the {@link EventFactory}, issues decorated
  * {@link Ticket}s, manages capacity and the waitlist, tracks attendance
  * and sends reminders.
@@ -35,7 +36,7 @@ public class EventService {
 
     private Event store(Event event) {
         // Every event forwards its changes to the system bus.
-        event.attach(busNotifier);
+        event.registerObserver(busNotifier);
         events.put(event.getId(), event);
         return event;
     }
@@ -46,6 +47,20 @@ public class EventService {
 
     public List<Event> listEvents() {
         return List.copyOf(events.values());
+    }
+
+    /**
+     * Deletes an event that nobody has signed up for. An event with people
+     * registered or waitlisted must be cancelled instead, so they are told.
+     */
+    public void deleteEvent(String eventId) {
+        Event event = require(eventId);
+        if (event.hasPeople()) {
+            throw new IllegalStateException(event.getName() + " has people registered or waitlisted"
+                    + " - cancel the event instead so they are notified");
+        }
+        event.removeAllObservers();
+        events.remove(eventId);
     }
 
     public List<Event> upcomingEvents(LocalDateTime now) {
@@ -59,6 +74,12 @@ public class EventService {
 
     public RegistrationResult register(String eventId, Attendee attendee, TicketAddOn... addOns) {
         Event event = require(eventId);
+        if (attendee == null) {
+            throw new IllegalArgumentException("Attendee is required");
+        }
+        if (addOns == null || Arrays.asList(addOns).contains(null)) {
+            throw new IllegalArgumentException("Ticket add-ons cannot be null");
+        }
         if (event.isCancelled()) {
             throw new IllegalStateException(event.getName() + " is cancelled");
         }
@@ -80,8 +101,21 @@ public class EventService {
     }
 
     /**
+     * Same as {@link #register(String, Attendee, TicketAddOn...)}, but refuses
+     * an event that has already started at {@code now}.
+     */
+    public RegistrationResult register(String eventId, Attendee attendee, LocalDateTime now, TicketAddOn... addOns) {
+        Event event = require(eventId);
+        requireNow(now);
+        if (!event.getDateTime().isAfter(now)) {
+            throw new IllegalStateException(event.getName() + " has already started - registration is closed");
+        }
+        return register(eventId, attendee, addOns);
+    }
+
+    /**
      * Cancels a registration (or removes the person from the waitlist).
-     * A freed seat is given to the first person waiting.
+     * A freed seat is given to the first person waiting, unless the event is cancelled.
      *
      * @return false if the attendee was neither registered nor waitlisted
      */
@@ -98,6 +132,9 @@ public class EventService {
     }
 
     private void promoteFromWaitlist(Event event) {
+        if (event.isCancelled()) {
+            return;
+        }
         while (!event.isFull()) {
             WaitlistEntry next = event.pollWaitlist();
             if (next == null) {
@@ -127,6 +164,7 @@ public class EventService {
 
     public void checkIn(String eventId, Attendee attendee) {
         Event event = require(eventId);
+        event.requireNotCancelled("check anyone in");
         if (!event.isRegistered(attendee)) {
             throw new IllegalArgumentException(attendee.getName() + " is not registered for " + event.getName());
         }
@@ -172,12 +210,36 @@ public class EventService {
         require(eventId).relocate(newLocation);
     }
 
+    /**
+     * Cancels the event. Registered people hear through the event's
+     * observers; people on the waitlist are not observers, so each of them
+     * gets their own message on the bus as well.
+     */
     public void cancelEvent(String eventId) {
-        require(eventId).cancel();
+        Event event = require(eventId);
+        List<Attendee> waiting = event.getWaitlist();
+        event.cancel();
+        for (Attendee attendee : waiting) {
+            bus.publish(new SystemEvent(SystemEventType.EVENT_CANCELLED,
+                    event.getName() + " has been cancelled - you have been removed from the waitlist",
+                    attendee, event));
+        }
     }
 
+    /** Refuses a cancelled event (see {@link Event#remind()}). */
     public void sendReminder(String eventId) {
         require(eventId).remind();
+    }
+
+    /** Sends a reminder, refusing an event that is cancelled or has already started at {@code now}. */
+    public void sendReminder(String eventId, LocalDateTime now) {
+        Event event = require(eventId);
+        requireNow(now);
+        event.requireNotCancelled("send a reminder");
+        if (!event.getDateTime().isAfter(now)) {
+            throw new IllegalStateException(event.getName() + " has already started - no reminder sent");
+        }
+        event.remind();
     }
 
     /** Sends reminders for every event starting within {@code window} of {@code now}. */
@@ -191,6 +253,58 @@ public class EventService {
             }
         }
         return reminded;
+    }
+
+    // ---- Editing events (Update in CRUD) ----
+
+    public void renameEvent(String eventId, String newName) {
+        require(eventId).rename(newName);
+    }
+
+    /** Applies to tickets issued from now on; tickets already issued keep their price. */
+    public void setBaseTicketPrice(String eventId, double price) {
+        require(eventId).setBaseTicketPrice(price);
+    }
+
+    /**
+     * Changes the number of seats. It cannot go below the number already
+     * registered; if seats are added, people waiting are promoted into them.
+     */
+    public void setCapacity(String eventId, int capacity) {
+        Event event = require(eventId);
+        event.setCapacity(capacity);
+        promoteFromWaitlist(event);
+    }
+
+    public void setFundraiserGoal(String eventId, double goal) {
+        requireType(eventId, Fundraiser.class, "a fundraiser").setFundraisingGoal(goal);
+    }
+
+    public void recordPledge(String eventId, double amount) {
+        requireType(eventId, Fundraiser.class, "a fundraiser").recordPledge(amount);
+    }
+
+    public void setWorkshopDetails(String eventId, String topic, String instructor) {
+        requireType(eventId, Workshop.class, "a workshop").setDetails(topic, instructor);
+    }
+
+    public void setTargetCommunity(String eventId, String community) {
+        requireType(eventId, OutreachProgram.class, "an outreach program").setTargetCommunity(community);
+    }
+
+    private <T extends Event> T requireType(String eventId, Class<T> type, String what) {
+        Event event = require(eventId);
+        if (!type.isInstance(event)) {
+            throw new IllegalArgumentException(event.getName() + " (" + eventId + ") is a "
+                    + event.getType() + ", not " + what);
+        }
+        return type.cast(event);
+    }
+
+    private static void requireNow(LocalDateTime now) {
+        if (now == null) {
+            throw new IllegalArgumentException("The current time is required");
+        }
     }
 
     private Event require(String eventId) {

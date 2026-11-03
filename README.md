@@ -1,8 +1,8 @@
 # Design-Patterns: Non-Profit Management System
 
-A Java console system for a non-profit organization. It covers donations, volunteers, events, beneficiaries and communication, and is built to demonstrate the design patterns from the course: **Factory, Observer, Strategy, Template Method, Facade, Decorator, Singleton**.
+A Java console system for a non-profit organization. It covers donations, volunteers, events, beneficiaries and communication, and is built to demonstrate the design patterns from the course: **Simple Factory, Factory Method, Observer, Strategy, Template Method, Decorator, Singleton, MVC**.
 
-The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-design.md`](docs/superpowers/specs/2026-10-24-nonprofit-system-design.md).
+The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-design.md`](docs/superpowers/specs/2026-10-24-nonprofit-system-design.md). It planned a `NonProfitFacade`; that was dropped, and there is **no Facade** in the code: the main menu controller gets the module services from `DataStore` and calls them directly. This README and the diagrams in `output/` describe the code as it is.
 
 ## Team and ownership
 
@@ -10,41 +10,45 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 |---|---|---|---|---|---|---|
 | 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory Method, Template Method | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
-| 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
+| 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Simple Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | [`output/beneficiary.puml`](output/beneficiary.puml) | **Done** |
 | 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer | [`output/communication.puml`](output/communication.puml) | **Done** |
-| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App` | Data store, event bus, system facade, console menu, overall diagram, requirements doc | Singleton, Observer, Facade, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
+| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App` | Data store, event bus, console menu, overall diagram, requirements doc | Singleton, Observer, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
 
-\* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`.
+\* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`. `Person.updateContact(...)` lets every module edit a person's name and contact details (the ID never changes, and a blank name is refused).
+
+**Observer names.** The Observer code uses the lecture's names. In the Events module, `EventSubject` is the Subject interface (`registerObserver`, `removeObserver`), `Event` implements it and calls its protected `notifyObservers(...)`, and `EventObserver.update(...)` is the Observer. The system-wide `EventBus` keeps the shorter names `subscribe` / `unsubscribe` / `publish`, which are the lecture's `registerObserver` / `removeObserver` / `notifyObservers`; `SystemObserver.onEvent(...)` is `update()`.
+
+**Model classes don't print (MVC).** Services and model classes return text instead of printing it. Channels return what they delivered, `CommunicationService` keeps it in an outbox until a view calls `takeOutput()`, and an `Attendee` stores its notes until a view calls `takeNewNotes()`. Only the views (`MainMenuView`, `VolunteerView`), `App` and the demo classes print.
 
 ## Events module (Student 3)
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Factory** | `EventFactory`, `EventType` | Creates a `Fundraiser`, `Workshop` or `OutreachProgram` from an enum or from user input (`"workshop"`, `"outreach program"`). |
-| **Decorator** | `Ticket`, `BasicTicket`, `TicketDecorator`, `VipTicket`, `MealTicket`, `ParkingTicket`, `TicketAddOn` | Ticket add-ons stack on a basic ticket, and each one adds to the price and the description. |
-| **Observer** | `Event` (subject), `EventObserver`, `Attendee`, `EventBusNotifier` | Registered attendees are notified when an event is rescheduled, relocated or cancelled, or when a reminder goes out. `EventBusNotifier` forwards these notifications to the system `EventBus` for the Communication module. |
+| **Simple Factory** | `EventFactory`, `EventType` | The static `EventFactory.create(...)` is the only place that creates a `Fundraiser`, `Workshop` or `OutreachProgram` (their constructors are package-private), from an enum or from user input (`"workshop"`, `"outreach program"`). Adding an event kind means one subclass and one case. |
+| **Decorator** | `Ticket`, `BasicTicket`, `TicketDecorator`, `VipTicket`, `MealTicket`, `ParkingTicket`, `TicketAddOn` | Ticket add-ons stack on a basic ticket, and each one adds to the price and the description. `BasicTicket` copies the event's base price when it is sold, so changing the price later does not change tickets already issued. |
+| **Observer** | `EventSubject` (subject interface), `Event` (concrete subject), `EventObserver`, `Attendee`, `EventBusNotifier` | Registering for an event calls `registerObserver(attendee)`; cancelling calls `removeObserver`. Registered attendees are notified when an event is rescheduled, relocated or cancelled, or when a reminder goes out. `EventBusNotifier` forwards these notifications to the system `EventBus` for the Communication module. People on the waitlist are not observers, so when an event is cancelled each of them is told directly (and a message is published for them on the bus). |
 
-Other features: capacity limits, a **waitlist with automatic promotion** when someone cancels, check-in and attendance reports, ticket revenue, fundraiser pledge progress, and reminders for events starting within a time window. `EventService` is the module's entry point and is what the Facade will call.
+Other features: capacity limits, a **waitlist with automatic promotion** when someone cancels, check-in and attendance reports, ticket revenue, fundraiser pledge progress, reminders for events starting within a time window, and editing an event (rename, capacity, base ticket price, type details). A cancelled event refuses edits, reminders, check-in and new registrations; an event that has already started refuses registration and reminders when the current time is passed in; an event can only be deleted while nobody is registered or waitlisted (otherwise cancel it so people are told); raising the capacity promotes people from the waitlist. `EventService` is the module's entry point and is what the main menu calls.
 
 ## Donations module (Student 1)
 
 | Pattern | Where | What it does |
 |---|---|---|
 | **Factory Method** | `DonationProcessor` (creator), `OnlineDonationProcessor`, `CheckDonationProcessor`, `InKindDonationProcessor` (concrete creators), `Donation` and its three subclasses (products) | `DonationProcessor.receive()` is the same for every donation: create it, give it the next number, add it to the donor's history. The create step is the factory method `createDonation()`, and each concrete creator decides which donation class to build, like the textbook's `PizzaStore`. `DonationService` only depends on the abstract creator and the abstract `Donation`. |
-| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxDeductionStatement` | `DonationDocument.generate()` is final and always prints header, body, totals and footer. A receipt covers one donation; a tax statement lists a donor's donations for one year with money and goods totals. A document with nothing to show (a tax year with no donations) is refused with an `IllegalStateException` instead of being printed. |
+| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxDeductionStatement` | `DonationDocument.generate()` is final and always builds header, body, totals and footer (as text the view shows). A receipt covers one donation; a tax statement lists a donor's donations for one year with money and goods totals. A document with nothing to show (a tax year with no donations) is refused with an `IllegalStateException` instead of being generated. |
 
-Other features: recurring monthly online gifts shown on the receipt (extended requirement 1), **campaign goals with progress** (extended requirement 2), totals by donation method, top donors, receipt numbers with no gaps when a bad donation is rejected, and donor records kept while they have donations. Each donation is published on the `EventBus` as `DONATION_RECEIVED` so the Communication module can thank the donor. `DonationService` is the module's entry point and is what the Facade will call.
+Other features: recurring monthly online gifts shown on the receipt (extended requirement 1), **campaign goals with progress** (extended requirement 2), totals by donation method, top donors, receipt numbers with no gaps when a bad donation is rejected, donations dated in the future refused (`recordDonation(..., today)`), donor contact details editable (`updateDonor`), and donor records kept while they have donations. Each donation is published on the `EventBus` as `DONATION_RECEIVED` so the Communication module can thank the donor. `DonationService` is the module's entry point and is what the main menu calls.
 
 ## Volunteers module (Student 2)
 
 | Pattern | Where | What it does |
 |---|---|---|
 | **Strategy** | `AssignmentStrategy`, `SkillBasedAssignment`, `AvailabilityBasedAssignment`, `PreferenceBasedAssignment`, `AssignmentMode` | `VolunteerService` holds one strategy that picks who gets a task. It can be swapped at runtime (or chosen from user input such as `"preference"`), so the same task can go to a different volunteer. |
-| **Template Method** | `Certificate`, `HoursCertificate`, `EventParticipationCertificate` | `Certificate.issue()` is final and always prints title, recipient, achievement and signature. Subclasses supply only the title and achievement, and can override the `isEligible()` hook. |
-| **MVC** | `VolunteerView` (view), `VolunteerController` (controller), `VolunteerService` and the classes it manages (model), `VolunteerApp` (starts it) | A console screen for the module. The view only prints menus and reads input; the controller turns each menu choice into calls on the model and tells the view what to show. The view also observes the `EventBus`, so it shows a notification when the model assigns a task. |
+| **Template Method** | `Certificate`, `HoursCertificate`, `EventParticipationCertificate` | `Certificate.issue()` is final and always builds title, recipient, achievement and signature. Subclasses supply only the title and achievement, and can override the `isEligible()` hook. |
+| **MVC** | `VolunteerView` (view), `VolunteerController` (controller), `VolunteerService` and the classes it manages (model), `VolunteerApp` (starts it) | A console screen for the module. The view only prints menus and reads input; the controller turns each menu choice into calls on the model and tells the view what to show. The view also observes the `EventBus`, so it shows a notification when the model assigns a task. When opened from the main menu, the controller is also given `CommunicationService::takeOutput` (as a `Supplier`), so the view shows the messages sent after each action without this module importing Communication. |
 
-Other features: volunteer profiles (skills, available days, preferred task categories), one task per volunteer per day, hour logging, a **leaderboard by hours** (extended requirement 4), suggestions without assigning, and freeing a removed volunteer's open tasks. Assignments are published on the `EventBus` as `VOLUNTEER_ASSIGNED` for the Communication module. `VolunteerService` is the module's entry point and is what the Facade will call.
+Other features: volunteer profiles (skills, available days, preferred task categories), one task per volunteer per day, hour logging, a **leaderboard by hours** (extended requirement 4), suggestions without assigning, freeing a removed volunteer's open tasks, editing contact details (`updateVolunteerContact`) and tasks (`updateTask`; a completed task cannot change), and adding/removing skills, days and preferences through `VolunteerService` (a skill or day that one of the volunteer's unfinished tasks needs cannot be removed). Assignments are published on the `EventBus` as `VOLUNTEER_ASSIGNED` for the Communication module. `VolunteerService` is the module's entry point and is what the main menu calls.
 
 ## Beneficiaries module (Student 4)
 
@@ -53,17 +57,17 @@ Other features: volunteer profiles (skills, available days, preferred task categ
 | **Strategy** | `AllocationStrategy`, `UrgencyFirstAllocation`, `FirstComeFirstServedAllocation`, `EqualShareAllocation`, `AllocationMode` | When stock is limited, `BeneficiaryService` asks its current strategy how to share it between the open needs of one category. It can be swapped at runtime (or chosen from user input such as `"equal"`), so the same stock can go to different people. `preview(...)` shows the result without handing anything out. |
 | **Template Method** | `ImpactReport`, `ProgramImpactReport`, `BeneficiaryProgressReport` | `ImpactReport.generate()` is final and always runs collect data, compute metrics, format rows, summary, footer. A program report shows what one program handed out and how many needs it fully met; a progress report shows one beneficiary's needs, met and open. A report with no data is refused with an `IllegalStateException`. |
 
-Other features: needs counted in units, so they cover both resources (food parcels) and services (counselling sessions); distributions can never exceed what is still needed; services given directly to one person (`giveDirectly`); and records with history cannot be removed. A HIGH-urgency need is published on the `EventBus` as `URGENT_NEED` (extended requirement 5) to the urgent responders set with `setUrgentResponders(Audience)`. `DataStore` passes the volunteers there when it starts up, so this module never imports the Volunteers package. Each distribution is published as `RESOURCE_DISTRIBUTED` to the beneficiary. `BeneficiaryService` is the module's entry point and is what the Facade will call.
+Other features: needs counted in units, so they cover both resources (food parcels) and services (counselling sessions); distributions can never exceed what is still needed; services given directly to one person (`giveDirectly`); beneficiaries and needs can be updated (`updateBeneficiary`, `updateNeed`); and records with history cannot be removed. A HIGH-urgency need is published on the `EventBus` as `URGENT_NEED` (extended requirement 5) to the urgent responders set with `setUrgentResponders(Audience)`. `DataStore` passes the volunteers there when it starts up, so this module never imports the Volunteers package. Each distribution is published as `RESOURCE_DISTRIBUTED` to the beneficiary. `BeneficiaryService` is the module's entry point and is what the main menu calls.
 
 ## Communication module (Student 5)
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Strategy** | `CommunicationChannel`, `EmailChannel`, `SmsChannel`, `SocialMediaChannel`, `ChannelSelector` | Each message is sent through a channel picked per recipient from their preferred contact (falling back to one they have details for). A caller can force one channel for a whole broadcast. |
-| **Decorator** | `MessageContent`, `PlainContent`, `ContentDecorator`, `UrgentTagDecorator`, `SignatureDecorator`, `FooterDecorator` | The text is built by stacking an urgent tag, a signature and an unsubscribe footer (e-mail only) around the plain text. |
+| **Strategy** | `CommunicationChannel`, `EmailChannel`, `SmsChannel`, `SocialMediaChannel`, `ChannelSelector` | Each message is sent through a channel picked per recipient from their preferred contact (falling back to one they have details for). A caller can force one channel for a whole broadcast. `send(...)` returns the delivered text instead of printing it. |
+| **Decorator** | `MessageContent`, `PlainContent`, `ContentDecorator`, `UrgentTagDecorator`, `SignatureDecorator`, `FooterDecorator` | The text is built by stacking an urgent tag, a signature and an unsubscribe footer around the plain text. Each channel decides its own decorations through `decorate(content, organisation)`: e-mail adds the signature and footer, social media the signature only, SMS nothing (the interface's default). `CommunicationService` only adds the urgent tag and then calls `channel.decorate(...)`, so it never checks which channel it has (no `instanceof`; it programs to the interface). |
 | **Observer** | `CommunicationService` | Subscribes to every `EventBus` topic and turns donations, assignments, registrations and event changes into messages. A system event with no recipient is sent to every person in its source's `Audience` (`Event` implements it), so Communication never depends on the Events package. |
 
-Other features: SMS cut to 160 characters, a communication log (`getLog()`), and `broadcast(...)` for manual sends.
+Other features: SMS cut to 160 characters, a communication log (`getLog()`), `broadcast(...)` for manual sends, and an outbox of delivered text that the views show after each action (`takeOutput()`).
 
 ## Core and main menu (Student 6)
 
@@ -71,11 +75,18 @@ The new classes live in `org.nonprofit.app`, not in `core`. They have to import 
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Singleton** | `DataStore` | Lazily created, thread-safe single instance that owns the one copy of each module service. `CommunicationService` is created only here, so no message is sent twice. It also passes the volunteers to `BeneficiaryService` as the urgent responders. A small attendee registry lives here too, so the menu can pick people for events. |
-| **Facade** | `NonProfitFacade` | The single entry point the main menu calls. Simple methods for every module (record a donation, assign a task, register an attendee with add-ons, distribute stock, broadcast to a group, ...) that delegate to the services from `DataStore`. |
-| **MVC** | `MainMenuView` (view), `MainMenuController` (controller), the module services (model) | Main menu with 1 Donations, 2 Volunteers, 3 Events, 4 Beneficiaries, 5 Communication. Volunteers opens the existing `VolunteerController` screen on the shared service. Results start with `>>`, errors with `!!`, and bad input never ends the program. |
+| **Singleton** | `DataStore` | Lazily created, thread-safe single instance that owns the one copy of each module service. `CommunicationService` is created only here, so no message is sent twice. It also passes the volunteers to `BeneficiaryService` as the urgent responders. A small attendee registry lives here too, so the menu can pick people for events, and `membersOf(BroadcastGroup)` builds the recipient list for a group broadcast. |
+| **MVC** | `MainMenuView` (view), `MainMenuController` (controller), the module services (model) | Main menu with 1 Donations, 2 Volunteers, 3 Events, 4 Beneficiaries, 5 Communication. The controller gets each service from `DataStore.getInstance()` and calls it directly; the view only prints and reads. Volunteers opens the existing `VolunteerController` screen on the shared service (its option 0 says "Back" there). Results start with `>>`, errors with `!!`, IDs can be typed in any case (`ben-1`), and bad input never ends the program. After each action the controller takes the new messages from `CommunicationService.takeOutput()` and the attendees' new notes, and the view prints them. |
 
-`App` loads sample data (`SampleData`) and opens the main menu. `App --demo` runs `SystemDemo`, a fixed walkthrough through the facade that shows every pattern in the system, with the same output on every run.
+What the menus offer:
+
+- **Donations**: list, register, update contact details and remove donors (a donor with donations cannot be removed); a donor's full history; record a donation with a typed date (default today, so it can be backdated into a tax year; a future date is refused); receipts and tax statements; create and list campaigns with progress; totals with the top N donors.
+- **Events**: list all events or the upcoming ones by date; create; edit (rename, reschedule, relocate, capacity, base ticket price, fundraiser goal and pledges, workshop topic and instructor, outreach target community); register an attendee with add-ons (a new person is checked first and only stored when the registration goes through, and their `ATT-` id is printed); cancel a registration or leave the waitlist; check in; update an attendee's contact details; a reminder for one event or for the next 24 hours; attendance report; cancel or delete an event (only an event nobody has signed up for can be deleted). Registration and reminders use the current time, so an event that has started is refused, and a cancelled event refuses every edit.
+- **Beneficiaries**: list, register, update and remove beneficiaries; add, update and remove needs; list open needs; change the allocation rule; preview a distribution before handing anything out; distribute stock; give units directly to one need; list distributions; impact reports.
+- **Volunteers**: the module's own screen (profiles, contact details, tasks including updating one, assignment rule, hours, leaderboard, certificates).
+- **Communication**: broadcast to a group and show the message log.
+
+`App` loads sample data (`SampleData`) and opens the main menu. `App --demo` runs `SystemDemo`, a fixed walkthrough that calls the module services and shows every pattern in the system (Singleton, Simple Factory (events) / Factory Method (donations), Strategy, Observer, Decorator, Template Method, and finally MVC by driving the main menu with scripted input), with the same output on every run.
 
 ## Running
 
@@ -97,9 +108,9 @@ In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open
 
 ## Diagrams
 
-The team uses a **UML generator** to produce the class diagrams from the Java source. Diagrams are not drawn by hand.
+The class diagrams are PlantUML files in the top-level **`output/`** folder: one per package plus `output/overall.puml` for the whole system. Each file's header comment says where it came from:
 
-- The generator writes one PlantUML file per package into the top-level **`output/`** folder (for example `output/event.puml` and `output/core.puml`).
-- Each file starts with a header comment that includes a `URL:` line. Open that link to see the rendered diagram on plantuml.com. You can also view the file with the VS Code *PlantUML* extension.
-- **After changing your package, run the generator again** so your diagram matches the code. Don't edit files in `output/` by hand, because the next run overwrites them.
-- Each student generates the diagram for their own package. Student 6 also generates `output/overall.puml` covering the whole system.
+- `output/core.puml` and `output/event.puml` started as output of the team's UML generator and were regrouped by pattern; they are now kept up to date by hand (last updated from the source on 2026-11-03). Regenerating them would lose the grouping.
+- `output/donation.puml`, `output/volunteer.puml`, `output/beneficiary.puml`, `output/communication.puml` and `output/overall.puml` are written by hand from the source.
+- When the code changes, update the matching diagram by hand.
+- All of them show only the important members. You can view any of them with the VS Code *PlantUML* extension, or check them with `plantuml -checkonly output/*.puml`.

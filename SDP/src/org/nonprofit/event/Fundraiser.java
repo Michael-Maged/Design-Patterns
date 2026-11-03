@@ -19,16 +19,18 @@ public class Fundraiser extends Event {
     }
 
     public void setFundraisingGoal(double goal) {
-        if (goal < 0) {
-            throw new IllegalArgumentException("Goal cannot be negative");
+        if (Double.isNaN(goal) || Double.isInfinite(goal) || goal < 0) {
+            throw new IllegalArgumentException("Goal must be a non-negative number");
         }
+        requireNotCancelled("change its goal");
         this.fundraisingGoal = goal;
     }
 
     public void recordPledge(double amount) {
-        if (amount <= 0) {
-            throw new IllegalArgumentException("Pledge must be positive");
+        if (Double.isNaN(amount) || Double.isInfinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Pledge must be a positive number");
         }
+        requireNotCancelled("record a pledge");
         amountRaised += amount;
     }
 

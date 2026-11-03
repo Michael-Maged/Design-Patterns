@@ -9,14 +9,20 @@ public class SocialMediaChannel implements CommunicationChannel {
     }
 
     @Override
-    public void send(Message message) {
+    public String send(Message message) {
         String handle = "@" + message.getRecipient().getName().replace(" ", "");
-        System.out.println("    [" + platform.toUpperCase() + " post] " + handle + " "
-                + message.getBody().replace("\n", " "));
+        return "    [" + platform.toUpperCase() + " post] " + handle + " "
+                + message.getBody().replace("\n", " ");
     }
 
     @Override
     public String name() {
         return platform;
+    }
+
+    /** A public post carries the signature only. */
+    @Override
+    public MessageContent decorate(MessageContent content, String organisation) {
+        return new SignatureDecorator(content, organisation);
     }
 }

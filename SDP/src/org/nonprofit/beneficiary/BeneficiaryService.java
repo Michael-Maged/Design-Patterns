@@ -8,12 +8,13 @@ import java.util.Locale;
 import java.util.Map;
 
 import org.nonprofit.core.Audience;
+import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Beneficiaries module (the Facade in core calls this).
+ * Entry point of the Beneficiaries module (the main menu calls this).
  * Keeps beneficiaries and their needs, shares out limited stock using the
  * current {@link AllocationStrategy}, records every distribution and
  * produces {@link ImpactReport}s.
@@ -54,6 +55,17 @@ public class BeneficiaryService {
         return beneficiaries.remove(beneficiaryId) != null;
     }
 
+    /**
+     * Changes a beneficiary's contact and household details. The ID, needs
+     * and distributions stay the same; a rejected update changes nothing.
+     */
+    public Beneficiary updateBeneficiary(String beneficiaryId, String name, String email, String phone,
+                                         ContactPreference preferredContact, String area, int householdSize) {
+        Beneficiary beneficiary = requireBeneficiary(beneficiaryId);
+        beneficiary.updateDetails(name, email, phone, preferredContact, area, householdSize);
+        return beneficiary;
+    }
+
     // ---- Needs ----
 
     /**
@@ -66,6 +78,21 @@ public class BeneficiaryService {
         beneficiary.addNeed(need);
         needs.put(need.getId(), need);
         if (urgency == Urgency.HIGH) {
+            alertUrgentNeed(need);
+        }
+        return need;
+    }
+
+    /**
+     * Changes the quantity and urgency of a need. The quantity cannot drop
+     * below what has already been received. If the need becomes HIGH
+     * urgency, URGENT_NEED is published just as {@link #addNeed} does.
+     */
+    public Need updateNeed(String needId, int quantity, Urgency urgency) {
+        Need need = requireNeed(needId);
+        boolean wasHigh = need.getUrgency() == Urgency.HIGH;
+        need.update(quantity, urgency);
+        if (urgency == Urgency.HIGH && !wasHigh && !need.isMet()) {
             alertUrgentNeed(need);
         }
         return need;
@@ -111,7 +138,7 @@ public class BeneficiaryService {
     }
 
     /**
-     * Who should hear about urgent needs. The Facade passes the volunteers
+     * Who should hear about urgent needs. DataStore passes the volunteers
      * here as an {@link Audience}, so this module never imports the
      * Volunteers package. With nobody set, the alert still goes on the bus.
      */

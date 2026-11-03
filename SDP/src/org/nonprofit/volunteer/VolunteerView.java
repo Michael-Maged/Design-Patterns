@@ -32,31 +32,39 @@ public class VolunteerView implements SystemObserver {
 
     // ---- Menus and input ----
 
+    /** The menu as the stand-alone screen shows it, with "0. Exit". */
+    public int showMenu(String currentRule) {
+        return showMenu(currentRule, "Exit");
+    }
+
     /**
      * Shows the main Volunteers menu and returns the number chosen,
      * -1 if the input was not a number, or 0 if there is no more input.
+     *
+     * @param zeroLabel "Exit" for the stand-alone screen, "Back" when opened from the main menu
      */
-    public int showMenu(String currentRule) {
+    public int showMenu(String currentRule, String zeroLabel) {
         out.println();
         out.println("========== VOLUNTEERS ==========");
         out.println("Assignment rule: " + currentRule);
         out.println(" 1. List volunteers");
         out.println(" 2. Register a volunteer");
-        out.println(" 3. Update a volunteer's profile");
+        out.println(" 3. Update a volunteer's profile or contact details");
         out.println(" 4. Remove a volunteer");
         out.println(" 5. Add a task");
         out.println(" 6. List tasks");
-        out.println(" 7. Remove a task");
-        out.println(" 8. Change the assignment rule");
-        out.println(" 9. Suggest a volunteer for a task");
-        out.println("10. Assign a task");
-        out.println("11. Assign all open tasks");
-        out.println("12. Unassign a task");
-        out.println("13. Log hours for a task");
-        out.println("14. Show the leaderboard");
-        out.println("15. Issue an hours certificate");
-        out.println("16. Issue an event participation certificate");
-        out.println(" 0. Exit");
+        out.println(" 7. Update a task");
+        out.println(" 8. Remove a task");
+        out.println(" 9. Change the assignment rule");
+        out.println("10. Suggest a volunteer for a task");
+        out.println("11. Assign a task");
+        out.println("12. Assign all open tasks");
+        out.println("13. Unassign a task");
+        out.println("14. Log hours for a task");
+        out.println("15. Show the leaderboard");
+        out.println("16. Issue an hours certificate");
+        out.println("17. Issue an event participation certificate");
+        out.println(" 0. " + zeroLabel);
         return askNumber("Choose");
     }
 
@@ -65,6 +73,7 @@ public class VolunteerView implements SystemObserver {
         out.println(" 1. Add a skill        2. Remove a skill");
         out.println(" 3. Add a day          4. Remove a day");
         out.println(" 5. Add a preference   6. Remove a preference");
+        out.println(" 7. Contact details (name, e-mail, phone, contact method)");
         return askNumber("What do you want to change");
     }
 
@@ -128,6 +137,13 @@ public class VolunteerView implements SystemObserver {
 
     public void showMessage(String message) {
         out.println(">> " + message);
+    }
+
+    /** What the Communication module delivered (or skipped), one line each, already indented. */
+    public void showDeliveries(List<String> lines) {
+        for (String line : lines) {
+            out.println(line);
+        }
     }
 
     public void showError(String message) {

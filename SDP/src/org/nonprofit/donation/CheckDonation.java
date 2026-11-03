@@ -2,7 +2,7 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** A donation paid by check. */
+/** A donation paid by check. FACTORY METHOD pattern - ConcreteProduct. */
 public class CheckDonation extends Donation {
     private final String checkNumber;
     private final String bankName;

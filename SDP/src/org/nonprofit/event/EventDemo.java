@@ -2,6 +2,7 @@ package org.nonprofit.event;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
@@ -41,6 +42,7 @@ public class EventDemo {
         Attendee omar = new Attendee("Omar Khaled", "omar@example.org", "+20100000002", ContactPreference.SMS);
         Attendee laila = new Attendee("Laila Samir", "laila@example.org", "+20100000003", ContactPreference.EMAIL);
         Attendee youssef = new Attendee("Youssef Ali", "youssef@example.org", "+20100000004", ContactPreference.SMS);
+        List<Attendee> people = List.of(mona, omar, laila, youssef);
 
         heading("2. DECORATOR - tickets with stacked add-ons");
         print(service.register(gala.getId(), mona));
@@ -57,14 +59,18 @@ public class EventDemo {
         print(service.register(firstAid.getId(), laila));
         System.out.println("  Omar cancels -> first person waiting is promoted:");
         service.cancelRegistration(firstAid.getId(), omar);
+        showNewNotes(people);
         System.out.println("  " + firstAid.summary());
 
         heading("4. OBSERVER - attendees and the EventBus hear about changes");
         service.reschedule(gala.getId(), gala.getDateTime().plusDays(1));
+        showNewNotes(people);
         service.relocate(gala.getId(), "Nile View Ballroom");
+        showNewNotes(people);
 
         heading("5. Reminders for events in the next 24 hours");
         var reminded = service.sendUpcomingReminders(now, Duration.ofHours(24));
+        showNewNotes(people);
         System.out.println("  Reminded: " + reminded);
 
         heading("6. Attendance tracking");
@@ -78,6 +84,7 @@ public class EventDemo {
         heading("7. Cancelling an event notifies everyone registered");
         service.register(foodDrive.getId(), youssef);
         service.cancelEvent(foodDrive.getId());
+        showNewNotes(people);
         try {
             service.register(foodDrive.getId(), mona);
         } catch (IllegalStateException e) {
@@ -89,6 +96,15 @@ public class EventDemo {
 
         heading("Mona's inbox");
         mona.getInbox().forEach(n -> System.out.println("  - " + n));
+    }
+
+    /** Attendees only store their notes; the demo (the view here) prints the new ones. */
+    private static void showNewNotes(List<Attendee> people) {
+        for (Attendee person : people) {
+            for (String note : person.takeNewNotes()) {
+                System.out.println("    [inbox of " + person.getName() + "] " + note);
+            }
+        }
     }
 
     private static void print(RegistrationResult result) {

@@ -30,20 +30,35 @@ public class MainMenuView {
 
     public int showDonationMenu() {
         return showMenu("DONATIONS", null, "Back",
-                "List donors", "Register a donor", "Record a donation", "List donations",
-                "Print a receipt", "Print a tax statement", "Totals, campaigns and top donors");
+                "List donors", "Register a donor", "Update a donor's contact details", "Remove a donor",
+                "A donor's donation history", "Record a donation", "List donations",
+                "Print a receipt", "Print a tax statement",
+                "Create a campaign", "List campaigns with progress", "Totals and top donors");
     }
 
     public int showEventMenu() {
         return showMenu("EVENTS", null, "Back",
-                "List events", "Create an event", "Register an attendee", "Check in an attendee",
-                "Cancel an event", "Send reminders (next 24 hours)", "Attendance report");
+                "List events", "List upcoming events (by date)", "Create an event",
+                "Edit an event (name, date, place, seats, price, type details)",
+                "Register an attendee", "Cancel a registration / leave the waitlist", "Check in an attendee",
+                "Update an attendee's contact details", "Send a reminder for one event",
+                "Send reminders (next 24 hours)", "Attendance report", "Cancel an event", "Delete an event");
+    }
+
+    /** The changes "Edit an event" offers, for the event named in {@code title}. */
+    public int showEventEditMenu(String title) {
+        return showMenu("EDIT " + title, null, "Back",
+                "Rename", "Reschedule", "Relocate", "Change capacity", "Change base ticket price",
+                "Fundraiser: set the goal", "Fundraiser: record a pledge",
+                "Workshop: topic and instructor", "Outreach: target community");
     }
 
     public int showBeneficiaryMenu(String currentRule) {
         return showMenu("BENEFICIARIES", "Allocation rule: " + currentRule, "Back",
-                "List beneficiaries", "Register a beneficiary", "Add a need", "List open needs",
-                "Change the allocation rule", "Distribute stock", "Impact report");
+                "List beneficiaries", "Register a beneficiary", "Update a beneficiary", "Remove a beneficiary",
+                "Add a need", "Update a need", "Remove a need", "List open needs",
+                "Change the allocation rule", "Preview a distribution", "Distribute stock",
+                "Give directly to one need", "List distributions", "Impact report");
     }
 
     public int showCommunicationMenu() {
@@ -110,6 +125,20 @@ public class MainMenuView {
 
     public void showMessage(String message) {
         out.println(">> " + message);
+    }
+
+    /** What the Communication module delivered (or skipped), one line each, already indented. */
+    public void showDeliveries(List<String> lines) {
+        for (String line : lines) {
+            out.println(line);
+        }
+    }
+
+    /** New notes that arrived in an attendee's inbox (the event OBSERVER updates). */
+    public void showInbox(String attendeeName, List<String> notes) {
+        for (String note : notes) {
+            out.println("    [inbox of " + attendeeName + "] " + note);
+        }
     }
 
     public void showError(String message) {

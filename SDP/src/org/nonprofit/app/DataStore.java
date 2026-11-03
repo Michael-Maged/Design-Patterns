@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.nonprofit.beneficiary.BeneficiaryService;
 import org.nonprofit.communication.CommunicationService;
+import org.nonprofit.core.Person;
 import org.nonprofit.donation.DonationService;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.event.EventService;
@@ -14,8 +15,9 @@ import org.nonprofit.volunteer.VolunteerService;
 
 /**
  * SINGLETON pattern: the one in-memory data store of the whole system.
- * It owns the single instance of every module service, so all screens and
- * the Facade work on the same donors, volunteers, events and beneficiaries.
+ * It owns the single instance of every module service, so the main menu,
+ * the Volunteers screen and the demo all work on the same donors,
+ * volunteers, events and beneficiaries.
  * Each service keeps its own records; this class does not copy them.
  *
  * It also wires the modules together without them importing each other:
@@ -85,5 +87,24 @@ public final class DataStore {
     /** A copy, so callers cannot change the registry. */
     public synchronized List<Attendee> listAttendees() {
         return new ArrayList<>(attendees.values());
+    }
+
+    // ---- Broadcast recipients ----
+
+    /** Everyone currently in a group, for a manual broadcast. */
+    public List<? extends Person> membersOf(BroadcastGroup group) {
+        if (group == null) {
+            throw new IllegalArgumentException("Group is required");
+        }
+        switch (group) {
+            case DONORS:
+                return donationService.listDonors();
+            case VOLUNTEERS:
+                return volunteerService.listVolunteers();
+            case BENEFICIARIES:
+                return beneficiaryService.listBeneficiaries();
+            default:
+                return listAttendees();
+        }
     }
 }

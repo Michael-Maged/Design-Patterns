@@ -7,11 +7,12 @@ hide circle
 hide empty members
 top to bottom direction
 
-package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
+package "OBSERVER role: module entry point" as entry #EEF7EE {
   class CommunicationService <<Observer>> {
     -organisation: String
     -selector: ChannelSelector
     -log: List<SentMessage>
+    -outbox: List<String>
     --
     +CommunicationService(organisation: String)
     +onEvent(event: SystemEvent): void
@@ -20,6 +21,7 @@ package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
     +send(recipient: Person, subject: String, text: String, urgent: boolean, forced: ContactPreference): boolean
     ~compose(text: String, urgent: boolean, channel: CommunicationChannel): String
     +getLog(): List<SentMessage>
+    +takeOutput(): List<String>
   }
 
   class SentMessage {
@@ -34,18 +36,20 @@ package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
 
 package "STRATEGY: how a message is delivered" as strategy #EEF3FB {
   interface CommunicationChannel <<Strategy>> {
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class EmailChannel {
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class SmsChannel {
     ~{static} MAX_LENGTH: int = 160
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
   }
 
@@ -53,8 +57,9 @@ package "STRATEGY: how a message is delivered" as strategy #EEF3FB {
     -platform: String
     --
     +SocialMediaChannel(platform: String)
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class ChannelSelector {
@@ -151,6 +156,17 @@ note right of ChannelSelector
   Picks the channel from the person's
   preferred contact; falls back to one
   they have details for.
+end note
+
+CommunicationChannel ..> MessageContent : decorate()
+
+note right of CommunicationChannel
+  Each channel decides its own decorations:
+  decorate() adds nothing by default; Email adds
+  Signature + Footer, SocialMedia adds Signature.
+  send() returns the delivered text (nothing is
+  printed); CommunicationService keeps it in the
+  outbox and a view prints takeOutput().
 end note
 
 note bottom of ContentDecorator

@@ -24,7 +24,7 @@ class App {
 ' ============================================================ app
 package "org.nonprofit.app" as app #FFF3E0 {
   class MainMenuController <<Controller>> {
-    -facade: NonProfitFacade
+    -store: DataStore
     -view: MainMenuView
     -volunteerScreen: VolunteerController
     --
@@ -38,18 +38,6 @@ package "org.nonprofit.app" as app #FFF3E0 {
     +showError(message: String): void
   }
 
-  class NonProfitFacade <<Facade>> {
-    -store: DataStore
-    --
-    +registerDonor(name: String, email: String, phone: String, contact: ContactPreference): Donor
-    +recordDonation(donorId: String, type: String, date: LocalDate, details: DonationDetails): Donation
-    +assignTask(taskId: String): Volunteer
-    +createEvent(type: String, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
-    +registerNewAttendee(eventId: String, name: String, email: String, phone: String, contact: ContactPreference, addOns: List<String>): RegistrationResult
-    +distribute(program: String, category: String, available: int, date: LocalDate): List<Distribution>
-    +broadcast(group: BroadcastGroup, subject: String, text: String, urgent: boolean, forced: ContactPreference): int
-  }
-
   class DataStore <<Singleton>> {
     +{static} ORGANISATION: String
     -{static} instance: DataStore
@@ -59,10 +47,12 @@ package "org.nonprofit.app" as app #FFF3E0 {
     +{static} getInstance(): DataStore
     +getDonationService(): DonationService
     +addAttendee(attendee: Attendee): Attendee
+    +findAttendee(attendeeId: String): Attendee
+    +membersOf(group: BroadcastGroup): List<? extends Person>
   }
 
   class SampleData {
-    +{static} load(facade: NonProfitFacade): void
+    +{static} load(store: DataStore): void
   }
 
   enum BroadcastGroup {
@@ -77,14 +67,13 @@ package "org.nonprofit.app" as app #FFF3E0 {
     Owns exactly one of each service so every screen
     shares the same data and every EventBus message is sent once.
     Its constructor wires the urgent responders: BeneficiaryService
-    gets an Audience of the current volunteers (not the Facade).
+    gets an Audience of the current volunteers.
   end note
 
-  note right of NonProfitFacade
-    <b>FACADE</b>: NonProfitFacade is the one entry point the menus use;
-    it hides DataStore and the five module services.
+  note right of MainMenuController
     <b>MVC</b>: MainMenuView (View) / MainMenuController (Controller);
-    the services behind the facade are the Model.
+    the module services from DataStore are the Model.
+    The controller calls the services directly.
   end note
 }
 
@@ -96,6 +85,8 @@ package "org.nonprofit.core" as core #F5F5F5 {
     -email: String
     -phone: String
     -preferredContact: ContactPreference
+    --
+    +updateContact(name: String, email: String, phone: String, preferredContact: ContactPreference): void
   }
 
   enum ContactPreference {
@@ -152,6 +143,8 @@ package "org.nonprofit.donation" as donation #E8F5E9 {
     -bus: EventBus
     --
     +registerDonor(donor: Donor): Donor
+    +updateDonor(donorId: String, name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
+    +removeDonor(donorId: String): boolean
     +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails): Donation
     +receipt(donationId: String, issueDate: LocalDate): String
     +taxStatement(donorId: String, year: int, issueDate: LocalDate): String
@@ -217,12 +210,13 @@ package "org.nonprofit.volunteer" as volunteer #E3F2FD {
   class VolunteerController <<Controller>> {
     -service: VolunteerService
     -view: VolunteerView
+    -embedded: boolean
     --
     +run(): void
   }
 
   class VolunteerView <<View>> {
-    +showMenu(currentRule: String): int
+    +showMenu(currentRule: String, zeroLabel: String): int
     +ask(prompt: String): String
     +onEvent(event: SystemEvent): void
   }
@@ -233,6 +227,7 @@ package "org.nonprofit.volunteer" as volunteer #E3F2FD {
     -strategy: AssignmentStrategy
     -bus: EventBus
     --
+    +updateTask(taskId: String, name: String, requiredSkill: String, day: DayOfWeek, category: String, eventName: String): Task
     +setStrategy(mode: AssignmentMode): void
     +assign(taskId: String): Volunteer
     +logHours(taskId: String, hours: double, date: LocalDate): void
@@ -304,11 +299,15 @@ package "org.nonprofit.event" as event #F3E5F5 {
     -bus: EventBus
     --
     +createEvent(type: EventType, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
-    +register(eventId: String, attendee: Attendee, addOns: TicketAddOn...): RegistrationResult
+    +register(eventId: String, attendee: Attendee, now: LocalDateTime, addOns: TicketAddOn...): RegistrationResult
+    +cancelRegistration(eventId: String, attendee: Attendee): boolean
+    +upcomingEvents(now: LocalDateTime): List<Event>
+    +sendReminder(eventId: String, now: LocalDateTime): void
     +cancelEvent(eventId: String): void
+    +deleteEvent(eventId: String): void
   }
 
-  class EventFactory <<Factory>> {
+  class EventFactory <<SimpleFactory>> {
     -EventFactory()
     +{static} create(type: EventType, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
   }
@@ -319,12 +318,13 @@ package "org.nonprofit.event" as event #F3E5F5 {
     OUTREACH
   }
 
-  abstract class Event <<Subject>> {
+  abstract class Event <<ConcreteSubject>> {
     -capacity: int
     -registrations: Map<Attendee, Ticket>
     -observers: List<EventObserver>
     --
-    +attach(observer: EventObserver): void
+    +registerObserver(observer: EventObserver): void
+    +removeObserver(observer: EventObserver): void
     #notifyObservers(change: EventChange, message: String): void
     +cancel(): void
     +getAudience(): List<Attendee>
@@ -333,6 +333,11 @@ package "org.nonprofit.event" as event #F3E5F5 {
   class Fundraiser
   class Workshop
   class OutreachProgram
+
+  interface EventSubject <<Subject>> {
+    +registerObserver(observer: EventObserver): void
+    +removeObserver(observer: EventObserver): void
+  }
 
   interface EventObserver <<Observer>> {
     +update(event: Event, change: EventChange, message: String): void
@@ -377,14 +382,15 @@ package "org.nonprofit.event" as event #F3E5F5 {
   }
 
   note top of EventFactory
-    <b>FACTORY</b>: EventFactory.create(EventType, ...)
+    <b>SIMPLE FACTORY</b>: EventFactory.create(EventType, ...)
     returns Fundraiser / Workshop / OutreachProgram
     (their constructors are package-private).
   end note
 
   note bottom of EventObserver
-    <b>OBSERVER</b> (events): Event (Subject: attach/notifyObservers),
-    EventObserver; Attendee and EventBusNotifier (package-private)
+    <b>OBSERVER</b> (events): EventSubject (Subject: registerObserver/
+    removeObserver), Event (ConcreteSubject, notifyObservers),
+    EventObserver (update); Attendee and EventBusNotifier (package-private)
     are ConcreteObservers. EventBusNotifier forwards changes to EventBus.
   end note
 
@@ -403,6 +409,7 @@ package "org.nonprofit.beneficiary" as beneficiary #E0F2F1 {
     -bus: EventBus
     --
     +addNeed(beneficiaryId: String, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate): Need
+    +updateNeed(needId: String, quantity: int, urgency: Urgency): Need
     +setStrategy(mode: AllocationMode): void
     +distribute(program: String, category: String, available: int, date: LocalDate): List<Distribution>
     +programImpactReport(program: String, date: LocalDate): String
@@ -480,6 +487,7 @@ package "org.nonprofit.communication" as communication #FFFDE7 {
     +broadcast(recipients: Collection<? extends Person>, subject: String, text: String, urgent: boolean, forced: ContactPreference): int
     +send(recipient: Person, subject: String, text: String, urgent: boolean, forced: ContactPreference): boolean
     ~compose(text: String, urgent: boolean, channel: CommunicationChannel): String
+    +takeOutput(): List<String>
   }
 
   class ChannelSelector {
@@ -488,8 +496,9 @@ package "org.nonprofit.communication" as communication #FFFDE7 {
   }
 
   interface CommunicationChannel <<Strategy>> {
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
   class EmailChannel <<ConcreteStrategy>>
   class SmsChannel <<ConcreteStrategy>>
@@ -526,23 +535,22 @@ package "org.nonprofit.communication" as communication #FFFDE7 {
 }
 
 ' ============================================================ relationships: app layer
-App ..> NonProfitFacade : <<creates>>
+App ..> DataStore : getInstance()
 App ..> MainMenuController : <<creates>> / run()
 App ..> MainMenuView : <<creates>>
 App ..> VolunteerController : <<creates>>
 App ..> VolunteerView : <<creates>>
-App ..> SampleData : load(facade)
-SampleData ..> NonProfitFacade
+App ..> SampleData : load(store)
+SampleData ..> DataStore
 MainMenuController --> MainMenuView
-MainMenuController --> NonProfitFacade
-MainMenuController --> VolunteerController : opens Volunteers screen
-NonProfitFacade --> DataStore
-NonProfitFacade ..> BroadcastGroup
-NonProfitFacade --> DonationService
-NonProfitFacade --> VolunteerService
-NonProfitFacade --> EventService
-NonProfitFacade --> BeneficiaryService
-NonProfitFacade --> CommunicationService
+MainMenuController --> DataStore
+MainMenuController --> VolunteerController : opens Volunteers screen (Back)
+MainMenuController ..> BroadcastGroup
+MainMenuController ..> DonationService
+MainMenuController ..> EventService
+MainMenuController ..> BeneficiaryService
+MainMenuController ..> CommunicationService
+DataStore ..> BroadcastGroup
 DataStore *-- "1" DonationService
 DataStore *-- "1" VolunteerService
 DataStore *-- "1" EventService
@@ -620,6 +628,7 @@ EventFactory ..> Event : <<creates>>
 Event <|-- Fundraiser
 Event <|-- Workshop
 Event <|-- OutreachProgram
+EventSubject <|.. Event
 Event o-- "*" EventObserver : observers
 EventObserver <|.. Attendee
 EventObserver <|.. EventBusNotifier
@@ -666,7 +675,7 @@ ContentDecorator <|-- FooterDecorator
 note as dependencyRule
   <b>Module rule</b>: feature packages (donation, volunteer, event,
   beneficiary, communication) depend only on <b>core</b>,
-  never on each other. Only <b>app</b> (DataStore, NonProfitFacade,
+  never on each other. Only <b>app</b> (DataStore,
   MainMenuController) and App know all of them.
 end note
 

@@ -2,7 +2,10 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** A card or bank-transfer donation made online, optionally repeated every month. */
+/**
+ * A card or bank-transfer donation made online, optionally repeated every month.
+ * FACTORY METHOD pattern - ConcreteProduct.
+ */
 public class OnlineDonation extends Donation {
     private final String paymentReference;
     private final boolean recurringMonthly;

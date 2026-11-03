@@ -51,6 +51,7 @@ package "Model: beneficiaries, needs, distributions" as model #EEF7EE {
     +unitsReceived(): int
     +summary(): String
     .. bookkeeping (package-private) ..
+    ~updateDetails(name: String, email: String, phone: String, preferredContact: ContactPreference, area: String, householdSize: int): void
     ~addNeed(need: Need): void
     ~removeNeed(need: Need): void
     ~addDistribution(distribution: Distribution): void
@@ -66,6 +67,7 @@ package "Model: beneficiaries, needs, distributions" as model #EEF7EE {
     -received: int
     --
     ~Need(beneficiary: Beneficiary, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate)
+    ~update(quantity: int, urgency: Urgency): void
     ~receive(units: int): void
     +remaining(): int
     +isMet(): boolean
@@ -190,7 +192,9 @@ package "Service: needs, distribution, reports" as service #F3EEF8 {
     +registerBeneficiary(beneficiary: Beneficiary): Beneficiary
     +findBeneficiary(beneficiaryId: String): Beneficiary
     +removeBeneficiary(beneficiaryId: String): boolean
+    +updateBeneficiary(beneficiaryId: String, name: String, email: String, phone: String, preferredContact: ContactPreference, area: String, householdSize: int): Beneficiary
     +addNeed(beneficiaryId: String, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate): Need
+    +updateNeed(needId: String, quantity: int, urgency: Urgency): Need
     +removeNeed(needId: String): boolean
     +openNeeds(category: String): List<Need>
     +setUrgentResponders(responders: Audience): void

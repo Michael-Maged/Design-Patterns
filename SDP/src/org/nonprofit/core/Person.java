@@ -6,17 +6,36 @@ package org.nonprofit.core;
  */
 public abstract class Person {
     private final String id;
-    private final String name;
-    private final String email;
-    private final String phone;
-    private final ContactPreference preferredContact;
+    private String name;
+    private String email;
+    private String phone;
+    private ContactPreference preferredContact;
 
     protected Person(String id, String name, String email, String phone, ContactPreference preferredContact) {
+        this.id = id;
+        this.name = requireName(name);
+        this.email = email;
+        this.phone = phone;
+        this.preferredContact = preferredContact;
+    }
+
+    /**
+     * Checks a name before it is used. Subclasses call this before taking
+     * the next ID number, so a rejected person does not use one up.
+     */
+    protected static String requireName(String name) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Name is required");
         }
-        this.id = id;
-        this.name = name;
+        return name;
+    }
+
+    /**
+     * Changes the person's contact details. The name is checked first, so a
+     * rejected update leaves the person unchanged. The ID never changes.
+     */
+    public void updateContact(String name, String email, String phone, ContactPreference preferredContact) {
+        this.name = requireName(name);
         this.email = email;
         this.phone = phone;
         this.preferredContact = preferredContact;

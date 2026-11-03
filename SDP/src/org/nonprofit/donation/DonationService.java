@@ -7,12 +7,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Donations module (the Facade in core calls this).
+ * Entry point of the Donations module (the main menu calls this).
  * Keeps donors, donations and campaigns, hands each new donation to the
  * {@link DonationProcessor} for its method, publishes DONATION_RECEIVED on
  * the EventBus and produces receipts and tax statements.
@@ -71,6 +72,16 @@ public class DonationService {
         return donors.remove(donorId) != null;
     }
 
+    /**
+     * Changes a donor's contact details. The ID and donation history stay
+     * the same; a blank name is refused and leaves the donor unchanged.
+     */
+    public Donor updateDonor(String donorId, String name, String email, String phone, ContactPreference preferredContact) {
+        Donor donor = requireDonor(donorId);
+        donor.updateContact(name, email, phone, preferredContact);
+        return donor;
+    }
+
     // ---- Campaigns ----
 
     public Campaign createCampaign(String name, double goal) {
@@ -126,6 +137,27 @@ public class DonationService {
         return recordDonation(donorId, DonationType.fromString(typeInput), date, details);
     }
 
+    /**
+     * Same as {@link #recordDonation(String, DonationType, LocalDate, DonationDetails)},
+     * but refuses a donation dated after {@code today}.
+     */
+    public Donation recordDonation(String donorId, DonationType type, LocalDate date, DonationDetails details,
+                                   LocalDate today) {
+        if (today == null) {
+            throw new IllegalArgumentException("Today's date is required");
+        }
+        if (date != null && date.isAfter(today)) {
+            throw new IllegalArgumentException("A donation cannot be dated in the future");
+        }
+        return recordDonation(donorId, type, date, details);
+    }
+
+    /** Records a donation from user input, refusing a date after {@code today}. */
+    public Donation recordDonation(String donorId, String typeInput, LocalDate date, DonationDetails details,
+                                   LocalDate today) {
+        return recordDonation(donorId, DonationType.fromString(typeInput), date, details, today);
+    }
+
     /** @return the donation, or null if there is none with that id */
     public Donation findDonation(String donationId) {
         return donations.get(donationId);
@@ -159,6 +191,9 @@ public class DonationService {
 
     /** Donors ranked by total given, most first (equal totals keep their registration order). */
     public List<Donor> topDonors(int top) {
+        if (top < 1) {
+            throw new IllegalArgumentException("Number of top donors must be at least 1");
+        }
         List<Donor> ranked = new ArrayList<>();
         for (Donor donor : donors.values()) {
             // Insert before the first donor who gave less.

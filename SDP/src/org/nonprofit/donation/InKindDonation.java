@@ -2,7 +2,7 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** A donation of goods or services, recorded at an estimated value. */
+/** A donation of goods or services, recorded at an estimated value. FACTORY METHOD pattern - ConcreteProduct. */
 public class InKindDonation extends Donation {
     private final String itemDescription;
 

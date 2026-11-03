@@ -183,11 +183,14 @@ package "Model and service" as service #F3EEF8 {
     +findDonor(donorId: String): Donor
     +listDonors(): List<Donor>
     +removeDonor(donorId: String): boolean
+    +updateDonor(donorId: String, name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
     +createCampaign(name: String, goal: double): Campaign
     +findCampaign(name: String): Campaign
     +listCampaigns(): List<Campaign>
     +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails): Donation
     +recordDonation(donorId: String, typeInput: String, date: LocalDate, details: DonationDetails): Donation
+    +recordDonation(donorId: String, type: DonationType, date: LocalDate, details: DonationDetails, today: LocalDate): Donation
+    +recordDonation(donorId: String, typeInput: String, date: LocalDate, details: DonationDetails, today: LocalDate): Donation
     +findDonation(donationId: String): Donation
     +listDonations(): List<Donation>
     +totalRaised(): double

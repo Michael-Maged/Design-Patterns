@@ -2,7 +2,7 @@ package org.nonprofit.app;
 
 import java.util.Locale;
 
-/** The groups a manual broadcast can go to (used by {@link NonProfitFacade#broadcast}). */
+/** The groups a manual broadcast can go to (see {@link DataStore#membersOf}). */
 public enum BroadcastGroup {
     DONORS,
     VOLUNTEERS,

@@ -3,7 +3,7 @@ package org.nonprofit.donation;
 import java.time.LocalDate;
 
 /**
- * FACTORY METHOD pattern (creator): {@link #receive} is the workflow every
+ * FACTORY METHOD pattern - Creator (abstract): {@link #receive} is the workflow every
  * donation goes through, the same way {@code PizzaStore.orderPizza()} is in
  * the textbook. The one step that differs - which concrete {@link Donation}
  * to build - is the factory method {@link #createDonation}, which each
