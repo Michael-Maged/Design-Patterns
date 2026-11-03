@@ -14,13 +14,16 @@ import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Events module (the main menu calls this).
+ * Entry point of the Events module (the Events screen, {@link EventController}, calls this).
  * Creates events through the {@link EventFactory}, issues decorated
  * {@link Ticket}s, manages capacity and the waitlist, tracks attendance
- * and sends reminders.
+ * and sends reminders. It also keeps the attendees on file, so the Events
+ * screen can pick an existing person by ID.
  */
 public class EventService {
     private final Map<String, Event> events = new LinkedHashMap<>();
+    /** The people on file, by ID (registering for an event does not add anyone here). */
+    private final Map<String, Attendee> attendees = new LinkedHashMap<>();
     private final EventObserver busNotifier = new EventBusNotifier();
     private final EventBus bus = EventBus.getInstance();
 
@@ -68,6 +71,26 @@ public class EventService {
                 .filter(e -> !e.isCancelled() && e.getDateTime().isAfter(now))
                 .sorted((a, b) -> a.getDateTime().compareTo(b.getDateTime()))
                 .toList();
+    }
+
+    // ---- Attendees on file ----
+
+    public synchronized Attendee addAttendee(Attendee attendee) {
+        if (attendee == null) {
+            throw new IllegalArgumentException("Attendee is required");
+        }
+        attendees.put(attendee.getId(), attendee);
+        return attendee;
+    }
+
+    /** @return the attendee, or null if there is none with that id */
+    public synchronized Attendee findAttendee(String attendeeId) {
+        return attendees.get(attendeeId);
+    }
+
+    /** A copy, so callers cannot change the registry. */
+    public synchronized List<Attendee> listAttendees() {
+        return new ArrayList<>(attendees.values());
     }
 
     // ---- Registration, ticketing and the waitlist ----

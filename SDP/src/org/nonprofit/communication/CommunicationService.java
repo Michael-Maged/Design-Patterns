@@ -14,7 +14,7 @@ import org.nonprofit.core.SystemEventType;
 import org.nonprofit.core.SystemObserver;
 
 /**
- * Entry point of the Communication module (the main menu calls this).
+ * Entry point of the Communication module (the Communication screen, {@link CommunicationController}, calls this).
  *
  * OBSERVER pattern (concrete observer): subscribes to every topic on the
  * {@link EventBus} and turns each system event into messages.

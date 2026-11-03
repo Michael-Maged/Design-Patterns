@@ -1,30 +1,30 @@
 package org.nonprofit.app;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.nonprofit.beneficiary.BeneficiaryService;
 import org.nonprofit.communication.CommunicationService;
+import org.nonprofit.core.Audience;
 import org.nonprofit.core.Person;
 import org.nonprofit.donation.DonationService;
-import org.nonprofit.event.Attendee;
 import org.nonprofit.event.EventService;
 import org.nonprofit.volunteer.VolunteerService;
 
 /**
  * SINGLETON pattern: the one in-memory data store of the whole system.
- * It owns the single instance of every module service, so the main menu,
- * the Donations and Volunteers screens and the demo all work on the same donors,
- * volunteers, events and beneficiaries.
+ * It owns the single instance of every module service, so the five module
+ * screens and the demo all work on the same donors, volunteers, events,
+ * attendees and beneficiaries.
  * Each service keeps its own records; this class does not copy them.
  *
  * It also wires the modules together without them importing each other:
  * the volunteers are passed to the Beneficiaries module as the
  * {@link org.nonprofit.core.Audience} for urgent needs, and the
  * {@link CommunicationService} is created exactly once here, so every
- * EventBus message is sent once.
+ * EventBus message is sent once. The Communication screen reaches people in
+ * the other modules through {@link #membersOf}, {@link #findPerson} and
+ * {@link #eventAudience}, which only hand out core types ({@link Person},
+ * {@link Audience}).
  *
  * It lives in {@code org.nonprofit.app}, not in {@code core}, because it
  * must import every module and {@code core} must not depend on any of them.
@@ -40,9 +40,6 @@ public final class DataStore {
     private final EventService eventService = new EventService();
     private final BeneficiaryService beneficiaryService = new BeneficiaryService();
     private final CommunicationService communicationService = new CommunicationService(ORGANISATION);
-
-    /** EventService has no store for people, so the attendees the menu can pick are kept here. */
-    private final Map<String, Attendee> attendees = new LinkedHashMap<>();
 
     private DataStore() {
         // URGENT_NEED goes to whoever volunteers at the moment it is raised.
@@ -69,26 +66,6 @@ public final class DataStore {
     public BeneficiaryService getBeneficiaryService() { return beneficiaryService; }
     public CommunicationService getCommunicationService() { return communicationService; }
 
-    // ---- Attendees ----
-
-    public synchronized Attendee addAttendee(Attendee attendee) {
-        if (attendee == null) {
-            throw new IllegalArgumentException("Attendee is required");
-        }
-        attendees.put(attendee.getId(), attendee);
-        return attendee;
-    }
-
-    /** @return the attendee, or null if there is none with that id */
-    public synchronized Attendee findAttendee(String attendeeId) {
-        return attendees.get(attendeeId);
-    }
-
-    /** A copy, so callers cannot change the registry. */
-    public synchronized List<Attendee> listAttendees() {
-        return new ArrayList<>(attendees.values());
-    }
-
     // ---- Broadcast recipients ----
 
     /** Everyone currently in a group, for a manual broadcast. */
@@ -104,7 +81,39 @@ public final class DataStore {
             case BENEFICIARIES:
                 return beneficiaryService.listBeneficiaries();
             default:
-                return listAttendees();
+                return eventService.listAttendees();
         }
+    }
+
+    /** The members of a group typed by the user, e.g. "donors" (see {@link BroadcastGroup#fromString}). */
+    public List<? extends Person> membersOf(String groupName) {
+        return membersOf(BroadcastGroup.fromString(groupName));
+    }
+
+    // ---- Looking people and events up for the Communication screen ----
+
+    /**
+     * Any person on file by ID: a donor (DNR-), volunteer (VOL-), attendee
+     * (ATT-) or beneficiary (BEN-).
+     *
+     * @return the person, or null if nobody has that id
+     */
+    public Person findPerson(String personId) {
+        Person person = donationService.findDonor(personId);
+        if (person == null) {
+            person = volunteerService.findVolunteer(personId);
+        }
+        if (person == null) {
+            person = eventService.findAttendee(personId);
+        }
+        if (person == null) {
+            person = beneficiaryService.findBeneficiary(personId);
+        }
+        return person;
+    }
+
+    /** @return the event with that id as an {@link Audience} (its registered attendees), or null if there is none */
+    public Audience eventAudience(String eventId) {
+        return eventService.findEvent(eventId).orElse(null);
     }
 }

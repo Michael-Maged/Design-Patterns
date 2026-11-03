@@ -13,7 +13,7 @@ import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Volunteers module (the main menu calls this).
+ * Entry point of the Volunteers module (the Volunteers screen, {@link VolunteerController}, calls this).
  * Keeps volunteers and tasks, assigns tasks using the current
  * {@link AssignmentStrategy}, logs hours, ranks volunteers and issues
  * {@link Certificate}s.

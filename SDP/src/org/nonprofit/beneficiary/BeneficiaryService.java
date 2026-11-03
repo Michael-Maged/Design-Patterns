@@ -14,7 +14,7 @@ import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Beneficiaries module (the main menu calls this).
+ * Entry point of the Beneficiaries module (the Beneficiaries screen, {@link BeneficiaryController}, calls this).
  * Keeps beneficiaries and their needs, shares out limited stock using the
  * current {@link AllocationStrategy}, records every distribution and
  * produces {@link ImpactReport}s.

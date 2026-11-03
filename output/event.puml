@@ -230,9 +230,47 @@ package "DECORATOR: ticket add-ons" as decorator #FDF3E7 {
   }
 }
 
+package "MVC: Events screen" as mvc #FFF8E1 {
+  class EventView <<View>> {
+    -in: Scanner
+    -out: PrintStream
+    --
+    +EventView(in: Scanner, out: PrintStream)
+    +showMenu(zeroLabel: String): int
+    +showEditMenu(title: String): int
+    +ask(prompt: String): String
+    +askNumber(prompt: String): int
+    +showList(lines: List<String>, emptyText: String): void
+    +showText(text: String): void
+    +showMessage(message: String): void
+    +showDeliveries(lines: List<String>): void
+    +showInbox(attendeeName: String, notes: List<String>): void
+    +showError(message: String): void
+  }
+
+  class EventController <<Controller>> {
+    -service: EventService
+    -view: EventView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +EventController(service: EventService, view: EventView, embedded: boolean, deliveries: Supplier<List<String>>)
+    +run(): void
+    -showNewMessages(): void
+    -createEvent(): void
+    -editEvent(): void
+    -registerAttendee(): void
+    -cancelRegistration(): void
+    -checkIn(): void
+    -updateAttendee(): void
+    -askId(prompt: String): String
+  }
+}
+
 package "Service: registration, waitlist, attendance" as service #F3EEF8 {
-  class EventService {
+  class EventService <<Model>> {
     -events: Map<String, Event>
+    -attendees: Map<String, Attendee>
     -busNotifier: EventObserver
     -bus: EventBus
     --
@@ -243,6 +281,10 @@ package "Service: registration, waitlist, attendance" as service #F3EEF8 {
     +listEvents(): List<Event>
     +upcomingEvents(now: LocalDateTime): List<Event>
     +deleteEvent(eventId: String): void
+    .. attendees on file ..
+    +addAttendee(attendee: Attendee): Attendee
+    +findAttendee(attendeeId: String): Attendee
+    +listAttendees(): List<Attendee>
     .. registration and attendance ..
     +register(eventId: String, attendee: Attendee, addOns: TicketAddOn...): RegistrationResult
     +register(eventId: String, attendee: Attendee, now: LocalDateTime, addOns: TicketAddOn...): RegistrationResult
@@ -288,6 +330,7 @@ package "Service: registration, waitlist, attendance" as service #F3EEF8 {
 }
 
 ' ---- vertical stacking of the groups ----
+mvc -[hidden]down- service
 service -[hidden]down- factory
 factory -[hidden]down- observer
 observer -[hidden]down- decorator
@@ -322,9 +365,14 @@ ParkingTicket -up-|> TicketDecorator
 TicketAddOn ..> TicketDecorator : <<wraps with>>
 Event "1" *-- "*" Ticket : registrations
 
+' ---- MVC ----
+EventController --> "1" EventView : view
+EventController --> "1" EventService : model
+
 ' ---- Service ----
 EventDemo ..> EventService
 EventService "1" o-- "*" Event
+EventService "1" o-- "*" Attendee : attendees on file
 EventService ..> EventFactory : uses
 EventService --> EventBusNotifier
 EventService ..> RegistrationResult
@@ -354,5 +402,13 @@ end note
 note right of Attendee
   Model class: stores notes only, never prints.
   A view prints takeNewNotes().
+end note
+
+note right of EventController
+  MVC: EventView (View), EventController (Controller),
+  EventService (Model). Opened from the main menu
+  (embedded: 0 = Back); after each action the view shows
+  the deliveries (passed in, so no import of Communication)
+  and every attendee's new inbox notes.
 end note
 @enduml

@@ -10,10 +10,14 @@ import java.util.Scanner;
 
 import org.nonprofit.beneficiary.AllocationMode;
 import org.nonprofit.beneficiary.Beneficiary;
+import org.nonprofit.beneficiary.BeneficiaryController;
 import org.nonprofit.beneficiary.BeneficiaryService;
+import org.nonprofit.beneficiary.BeneficiaryView;
 import org.nonprofit.beneficiary.Need;
 import org.nonprofit.beneficiary.Urgency;
+import org.nonprofit.communication.CommunicationController;
 import org.nonprofit.communication.CommunicationService;
+import org.nonprofit.communication.CommunicationView;
 import org.nonprofit.communication.SentMessage;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
@@ -27,7 +31,9 @@ import org.nonprofit.donation.DonationView;
 import org.nonprofit.donation.Donor;
 import org.nonprofit.event.Attendee;
 import org.nonprofit.event.Event;
+import org.nonprofit.event.EventController;
 import org.nonprofit.event.EventService;
+import org.nonprofit.event.EventView;
 import org.nonprofit.event.RegistrationResult;
 import org.nonprofit.event.TicketAddOn;
 import org.nonprofit.volunteer.AssignmentMode;
@@ -322,13 +328,21 @@ public final class SystemDemo {
                 communication::takeOutput);
         VolunteerController volunteerScreen = new VolunteerController(volunteers,
                 new VolunteerView(in, System.out), true, communication::takeOutput);
-        new MainMenuController(store, new MainMenuView(in, System.out), donationScreen, volunteerScreen).run();
+        EventController eventScreen = new EventController(events, new EventView(in, System.out), true,
+                communication::takeOutput);
+        BeneficiaryController beneficiaryScreen = new BeneficiaryController(beneficiaries,
+                new BeneficiaryView(in, System.out), true, communication::takeOutput);
+        CommunicationController communicationScreen = new CommunicationController(communication,
+                new CommunicationView(in, System.out), true, store::membersOf, store::findPerson,
+                store::eventAudience);
+        new MainMenuController(new MainMenuView(in, System.out), donationScreen, volunteerScreen,
+                eventScreen, beneficiaryScreen, communicationScreen).run();
 
         System.out.println();
         System.out.println("  " + donations.getDonors().size() + " donors, " + donations.getDonations().size()
                 + " donations, " + volunteers.listVolunteers().size() + " volunteers, "
                 + volunteers.listTasks().size() + " tasks, " + events.listEvents().size() + " events, "
-                + store.listAttendees().size() + " attendees, " + beneficiaries.listBeneficiaries().size()
+                + events.listAttendees().size() + " attendees, " + beneficiaries.listBeneficiaries().size()
                 + " beneficiaries, " + communication.getLog().size() + " messages sent.");
     }
 
@@ -339,7 +353,7 @@ public final class SystemDemo {
     }
 
     private Attendee addAttendee(String name, String email, String phone, ContactPreference contact) {
-        return store.addAttendee(new Attendee(name, email, phone, contact));
+        return events.addAttendee(new Attendee(name, email, phone, contact));
     }
 
     private int logSize() {
@@ -373,7 +387,7 @@ public final class SystemDemo {
     /** The demo is the view: prints the messages sent and the inbox notes received since the last call. */
     private void show() {
         communication.takeOutput().forEach(System.out::println);
-        for (Attendee attendee : store.listAttendees()) {
+        for (Attendee attendee : events.listAttendees()) {
             for (String note : attendee.takeNewNotes()) {
                 System.out.println("    [inbox of " + attendee.getName() + "] " + note);
             }

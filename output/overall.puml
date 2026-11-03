@@ -24,32 +24,33 @@ class App {
 ' ============================================================ app
 package "org.nonprofit.app" as app #FFF3E0 {
   class MainMenuController <<Controller>> {
-    -store: DataStore
     -view: MainMenuView
     -donationScreen: DonationController
     -volunteerScreen: VolunteerController
+    -eventScreen: EventController
+    -beneficiaryScreen: BeneficiaryController
+    -communicationScreen: CommunicationController
     --
     +run(): void
   }
 
   class MainMenuView <<View>> {
     +showMainMenu(): int
-    +ask(prompt: String): String
-    +showList(lines: List<String>, emptyText: String): void
+    +showMessage(message: String): void
     +showError(message: String): void
   }
 
   class DataStore <<Singleton>> {
     +{static} ORGANISATION: String
     -{static} instance: DataStore
-    -attendees: Map<String, Attendee>
     --
     -DataStore()
     +{static} getInstance(): DataStore
     +getDonationService(): DonationService
-    +addAttendee(attendee: Attendee): Attendee
-    +findAttendee(attendeeId: String): Attendee
     +membersOf(group: BroadcastGroup): List<? extends Person>
+    +membersOf(groupName: String): List<? extends Person>
+    +findPerson(personId: String): Person
+    +eventAudience(eventId: String): Audience
   }
 
   class SampleData {
@@ -72,9 +73,10 @@ package "org.nonprofit.app" as app #FFF3E0 {
   end note
 
   note right of MainMenuController
-    <b>MVC</b>: MainMenuView (View) / MainMenuController (Controller);
-    the module services from DataStore are the Model.
-    The controller calls the services directly.
+    <b>MVC</b>: MainMenuView (View) / MainMenuController (Controller).
+    Options 1-5 open the five module screens (each its own
+    View + Controller over its service from DataStore, the Model);
+    0 exits. App builds the screens with one shared Scanner.
   end note
 }
 
@@ -332,12 +334,33 @@ package "org.nonprofit.volunteer" as volunteer #E3F2FD {
 
 ' ============================================================ event
 package "org.nonprofit.event" as event #F3E5F5 {
-  class EventService {
+  class EventController <<Controller>> {
+    -service: EventService
+    -view: EventView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +run(): void
+  }
+
+  class EventView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +showEditMenu(title: String): int
+    +ask(prompt: String): String
+    +showDeliveries(lines: List<String>): void
+    +showInbox(attendeeName: String, notes: List<String>): void
+  }
+
+  class EventService <<Model>> {
     -events: Map<String, Event>
+    -attendees: Map<String, Attendee>
     -busNotifier: EventObserver
     -bus: EventBus
     --
     +createEvent(type: EventType, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
+    +addAttendee(attendee: Attendee): Attendee
+    +findAttendee(attendeeId: String): Attendee
+    +listAttendees(): List<Attendee>
     +register(eventId: String, attendee: Attendee, now: LocalDateTime, addOns: TicketAddOn...): RegistrationResult
     +cancelRegistration(eventId: String, attendee: Attendee): boolean
     +upcomingEvents(now: LocalDateTime): List<Event>
@@ -420,6 +443,12 @@ package "org.nonprofit.event" as event #F3E5F5 {
     +applyTo(ticket: Ticket): Ticket
   }
 
+  note top of EventController
+    <b>MVC</b>: EventView (View), EventController (Controller),
+    EventService (Model). After each action the view shows
+    what Communication sent and the attendees' new inbox notes.
+  end note
+
   note top of EventFactory
     <b>SIMPLE FACTORY</b>: EventFactory.create(EventType, ...)
     returns Fundraiser / Workshop / OutreachProgram
@@ -442,7 +471,22 @@ package "org.nonprofit.event" as event #F3E5F5 {
 
 ' ============================================================ beneficiary
 package "org.nonprofit.beneficiary" as beneficiary #E0F2F1 {
-  class BeneficiaryService <<Context>> {
+  class BeneficiaryController <<Controller>> {
+    -service: BeneficiaryService
+    -view: BeneficiaryView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +run(): void
+  }
+
+  class BeneficiaryView <<View>> {
+    +showMenu(currentRule: String, zeroLabel: String): int
+    +ask(prompt: String): String
+    +showDeliveries(lines: List<String>): void
+  }
+
+  class BeneficiaryService <<Model>> <<Context>> {
     -strategy: AllocationStrategy
     -urgentResponders: Audience
     -bus: EventBus
@@ -504,6 +548,11 @@ package "org.nonprofit.beneficiary" as beneficiary #E0F2F1 {
   class ProgramImpactReport <<ConcreteClass>>
   class BeneficiaryProgressReport <<ConcreteClass>>
 
+  note top of BeneficiaryController
+    <b>MVC</b>: BeneficiaryView (View), BeneficiaryController
+    (Controller), BeneficiaryService (Model).
+  end note
+
   note bottom of AllocationStrategy
     <b>STRATEGY</b>: BeneficiaryService (Context) -> AllocationStrategy;
     UrgencyFirst / FirstComeFirstServed / EqualShare; AllocationMode creates them.
@@ -518,7 +567,25 @@ package "org.nonprofit.beneficiary" as beneficiary #E0F2F1 {
 
 ' ============================================================ communication
 package "org.nonprofit.communication" as communication #FFFDE7 {
-  class CommunicationService <<Observer>> {
+  class CommunicationController <<Controller>> {
+    -service: CommunicationService
+    -view: CommunicationView
+    -embedded: boolean
+    -groupMembers: Function<String, List<? extends Person>>
+    -findPerson: Function<String, Person>
+    -eventAudience: Function<String, Audience>
+    --
+    +run(): void
+  }
+
+  class CommunicationView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +ask(prompt: String): String
+    +showLog(log: List<SentMessage>): void
+    +showDeliveries(lines: List<String>): void
+  }
+
+  class CommunicationService <<Model>> <<Observer>> {
     -organisation: String
     -selector: ChannelSelector
     --
@@ -562,6 +629,13 @@ package "org.nonprofit.communication" as communication #FFFDE7 {
   }
   class FooterDecorator <<ConcreteDecorator>>
 
+  note top of CommunicationController
+    <b>MVC</b>: CommunicationView (View), CommunicationController
+    (Controller), CommunicationService (Model). The people to write
+    to come from look-ups App wires to DataStore (core types only:
+    Person, Audience), so this module imports no other module.
+  end note
+
   note bottom of CommunicationChannel
     <b>STRATEGY</b>: CommunicationChannel; ChannelSelector picks
     Email / Sms / SocialMedia from the person's ContactPreference.
@@ -581,23 +655,26 @@ App ..> DonationController : <<creates>>
 App ..> DonationView : <<creates>>
 App ..> VolunteerController : <<creates>>
 App ..> VolunteerView : <<creates>>
+App ..> EventController : <<creates>>
+App ..> EventView : <<creates>>
+App ..> BeneficiaryController : <<creates>>
+App ..> BeneficiaryView : <<creates>>
+App ..> CommunicationController : <<creates>> (look-ups from DataStore)
+App ..> CommunicationView : <<creates>>
 App ..> SampleData : load(store)
 SampleData ..> DataStore
 MainMenuController --> MainMenuView
-MainMenuController --> DataStore
 MainMenuController --> DonationController : opens Donations screen (Back)
 MainMenuController --> VolunteerController : opens Volunteers screen (Back)
-MainMenuController ..> BroadcastGroup
-MainMenuController ..> EventService
-MainMenuController ..> BeneficiaryService
-MainMenuController ..> CommunicationService
+MainMenuController --> EventController : opens Events screen (Back)
+MainMenuController --> BeneficiaryController : opens Beneficiaries screen (Back)
+MainMenuController --> CommunicationController : opens Communication screen (Back)
 DataStore ..> BroadcastGroup
 DataStore *-- "1" DonationService
 DataStore *-- "1" VolunteerService
 DataStore *-- "1" EventService
 DataStore *-- "1" BeneficiaryService : ctor wires urgentResponders
 DataStore *-- "1" CommunicationService
-DataStore o-- "*" Attendee
 
 ' ============================================================ relationships: core
 EventBus o-- "*" SystemObserver : subscribers
@@ -627,6 +704,8 @@ VolunteerController ..> EventBus : subscribe(view)
 Event .down.|> Audience
 BeneficiaryService --> Audience : urgentResponders
 CommunicationService ..> Audience : broadcast to source audience
+CommunicationController ..> Person : groupMembers / findPerson
+CommunicationController ..> Audience : eventAudience
 
 ' ============================================================ relationships: donation
 DonationController --> DonationService : model
@@ -663,7 +742,10 @@ Certificate --> Volunteer
 VolunteerService ..> Certificate : <<issues>>
 
 ' ============================================================ relationships: event
+EventController --> EventService : model
+EventController --> EventView
 EventService o-- "*" Event
+EventService o-- "*" Attendee : attendees on file
 EventService ..> EventFactory : create
 EventService --> EventBusNotifier : busNotifier
 EventService ..> TicketAddOn : wraps BasicTicket
@@ -687,6 +769,8 @@ TicketDecorator <|-- ParkingTicket
 TicketAddOn ..> TicketDecorator : applyTo() wraps
 
 ' ============================================================ relationships: beneficiary
+BeneficiaryController --> BeneficiaryService : model
+BeneficiaryController --> BeneficiaryView
 BeneficiaryService o-- "*" Beneficiary
 BeneficiaryService --> AllocationStrategy
 AllocationStrategy <|.. UrgencyFirstAllocation
@@ -700,6 +784,8 @@ ImpactReport <|-- BeneficiaryProgressReport
 BeneficiaryService ..> ImpactReport : <<issues>>
 
 ' ============================================================ relationships: communication
+CommunicationController --> CommunicationService : model
+CommunicationController --> CommunicationView
 CommunicationService --> ChannelSelector
 ChannelSelector --> "3" CommunicationChannel
 CommunicationChannel <|.. EmailChannel
@@ -721,7 +807,8 @@ note as dependencyRule
   <b>Module rule</b>: feature packages (donation, volunteer, event,
   beneficiary, communication) depend only on <b>core</b>,
   never on each other. Only <b>app</b> (DataStore,
-  MainMenuController) and App know all of them.
+  SampleData, SystemDemo) and App know all of them;
+  MainMenuController knows only the five screens.
 end note
 
 

@@ -78,11 +78,11 @@ public final class SampleData {
                 "Grand Hall", 100);
         Event firstAid = events.createEvent("workshop", "First Aid Basics", now.plusHours(20), "Room 4B", 2);
         events.createEvent("outreach program", "Neighbourhood Food Drive", now.plusDays(3), "Community Center", 50);
-        Attendee mona = store.addAttendee(new Attendee("Mona Hassan", "mona@example.org", "+20100000001",
+        Attendee mona = events.addAttendee(new Attendee("Mona Hassan", "mona@example.org", "+20100000001",
                 ContactPreference.EMAIL));
-        Attendee omar = store.addAttendee(new Attendee("Omar Khaled", "omar@example.org", "+20100000002",
+        Attendee omar = events.addAttendee(new Attendee("Omar Khaled", "omar@example.org", "+20100000002",
                 ContactPreference.SMS));
-        Attendee laila = store.addAttendee(new Attendee("Laila Samir", "laila@example.org", "+20100000003",
+        Attendee laila = events.addAttendee(new Attendee("Laila Samir", "laila@example.org", "+20100000003",
                 ContactPreference.EMAIL));
         events.register(gala.getId(), mona);
         events.register(gala.getId(), omar, TicketAddOn.VIP);
