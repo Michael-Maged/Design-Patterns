@@ -8,7 +8,7 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
-| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, receipts and tax documents | Factory Method, Template Method | [`output/donation.puml`](output/donation.puml) | **Done** |
+| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory, Template Method, Observer, MVC | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` | Not started |
@@ -31,10 +31,12 @@ Other features: capacity limits, a **waitlist with automatic promotion** when so
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Factory Method** | `DonationProcessor` (creator), `OnlineDonationProcessor`, `CheckDonationProcessor`, `InKindDonationProcessor` (concrete creators), `Donation` and its three subclasses (products) | `DonationProcessor.receive()` is the same for every donation: create it, give it the next number, add it to the donor's history. The create step is the factory method `createDonation()`, and each concrete creator decides which donation class to build, like the textbook's `PizzaStore`. `DonationService` only depends on the abstract creator and the abstract `Donation`. |
-| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxDeductionStatement` | `DonationDocument.generate()` is final and always prints header, body, totals and footer. A receipt covers one donation; a tax statement lists a donor's donations for one year with money and goods totals. A document with nothing to show (a tax year with no donations) is refused with an `IllegalStateException` instead of being printed. |
+| **Factory** | `DonationFactory`, `DonationType`, `Donation` and its subclasses `OnlineDonation`, `CheckDonation`, `InKindDonation` | `DonationFactory.create(type, ...)` is the only place that decides which donation class to build. The subclass constructors are package-private, so nobody else can call `new`. A new donation method means one new subclass and one new `case`. |
+| **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxStatement` | `DonationDocument.generate()` is final and always prints header, body, totals, footer. A receipt covers one donation. A tax statement lists a donor's donations for one year, with money and goods totalled separately. The `canBeIssued()` hook stops an empty statement from being printed. |
+| **Observer** | `DonationService` (publisher), `DonationView` and `CommunicationService` (observers) | Every new donation is published on the `EventBus` as `DONATION_RECEIVED`. The Communication module sends the thank-you message and the screen shows a notification. `DonationService` never calls either of them directly. |
+| **MVC** | `DonationView`, `DonationController`, `DonationService` (model), `DonationApp` | An interactive console screen. The view only prints and reads input, and the controller turns menu choices into calls on the service. |
 
-Other features: recurring monthly online gifts shown on the receipt (extended requirement 1), **campaign goals with progress** (extended requirement 2), totals by donation method, top donors, receipt numbers with no gaps when a bad donation is rejected, and donor records kept while they have donations. Each donation is published on the `EventBus` as `DONATION_RECEIVED` so the Communication module can thank the donor. `DonationService` is the module's entry point and is what the Facade will call.
+Client requirements collected for this module: **monthly online gifts** (shown on the receipt) and **campaigns with a money goal and progress percentage**. Other features: totals by method, top donors, input checks (missing check number, negative amount, unknown campaign...), donation numbers with no gaps when a bad donation is rejected, and donors who have already given can't be deleted. `DonationService` is the module's entry point and is what the Facade will call.
 
 ## Volunteers module (Student 2)
 
@@ -66,10 +68,11 @@ java -cp bin org.nonprofit.event.EventDemo
 java -cp bin org.nonprofit.volunteer.VolunteerDemo
 java -cp bin org.nonprofit.volunteer.VolunteerApp
 java -cp bin org.nonprofit.donation.DonationDemo
+java -cp bin org.nonprofit.donation.DonationApp
 java -cp bin org.nonprofit.communication.CommunicationDemo
 ```
 
-In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` opens the interactive Volunteers screen; the `...Demo` classes run a fixed walkthrough.
+In VS Code, open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` and `DonationApp` open the interactive Volunteers and Donations screens; the `...Demo` classes run a fixed walkthrough.
 
 ## Diagrams
 
