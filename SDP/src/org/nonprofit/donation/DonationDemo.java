@@ -2,103 +2,107 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
+import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
-import org.nonprofit.core.SystemObserver;
 
 /**
- * Stand-alone walkthrough of the Donations module, showing each pattern.
- * Run: java -cp bin org.nonprofit.donation.DonationDemo
+ * A fixed walkthrough of the Donations module that shows each pattern.
+ * Run from the SDP folder:  java -cp bin org.nonprofit.donation.DonationDemo
  */
 public class DonationDemo {
 
     public static void main(String[] args) {
-        // Until the Communication module is merged, a simple subscriber
-        // stands in for it and prints the thank-you it would send.
-        EventBus bus = EventBus.getInstance();
-        bus.subscribe(SystemEventType.DONATION_RECEIVED, new SystemObserver() {
-            @Override
-            public void onEvent(SystemEvent event) {
-                System.out.println("    [EventBus] " + event);
-            }
-        });
+        // The Communication module listens on the EventBus. We create it here
+        // only so we can SEE the thank-you messages it sends (Observer pattern).
+        new CommunicationService(DonationDocument.ORGANIZATION);
 
         DonationService service = new DonationService();
         LocalDate today = LocalDate.of(2026, 11, 1);
 
-        Donor hany = service.registerDonor(new Donor("Hany Mansour", "hany@example.org", "+20120000001"));
-        Donor rania = service.registerDonor(
-                new Donor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS));
-        Donor bakery = service.registerDonor(new Donor("El Nour Bakery", "orders@elnour.example", "+20120000003"));
-        service.createCampaign("Winter Blankets", 15_000);
+        Donor hany = service.addDonor("Hany Mansour", "hany@example.org", "+20120000001", ContactPreference.EMAIL);
+        Donor rania = service.addDonor("Rania Kamel", "rania@example.org", "+20120000002", ContactPreference.SMS);
+        Donor bakery = service.addDonor("El Nour Bakery", "orders@elnour.example", "+20120000003", null);
+        service.addCampaign("Winter Blankets", 15_000);
 
-        heading("1. FACTORY METHOD - each creator decides which donation to build");
+        title("1. FACTORY METHOD - each creator decides which donation to build");
         for (DonationType type : DonationType.values()) {
-            System.out.println("  " + type + " is handled by " + service.processorFor(type).getClass().getSimpleName());
+            System.out.println("  " + type + " is handled by " + service.getCreator(type).getClass().getSimpleName());
         }
-        Donation online = service.recordDonation(hany.getId(), DonationType.ONLINE, today.minusMonths(9),
-                DonationDetails.of(500).reference("PAY-88213").recurring());
-        Donation check = service.recordDonation(rania.getId(), "check", today.minusMonths(2),
-                DonationDetails.of(2_000).reference("004517").bank("National Bank of Egypt").campaign("Winter Blankets"));
-        Donation goods = service.recordDonation(bakery.getId(), "in-kind", today.minusDays(5),
-                DonationDetails.of(1_200).item("300 loaves of bread for the food drive"));
-        for (Donation d : service.listDonations()) {
-            System.out.println("  " + d.getClass().getSimpleName() + ": " + d.summary());
+        System.out.println();
+
+        DonationForm onlineForm = new DonationForm(500);
+        onlineForm.setReference("PAY-88213");
+        onlineForm.setMonthly(true);
+        Donation online = service.donate(hany.getId(), DonationType.ONLINE, today.minusMonths(9), onlineForm);
+
+        DonationForm checkForm = new DonationForm(2_000);
+        checkForm.setReference("004517");
+        checkForm.setBank("National Bank of Egypt");
+        checkForm.setCampaign("Winter Blankets");
+        service.donate(rania.getId(), "check", today.minusMonths(2), checkForm);
+
+        DonationForm goodsForm = new DonationForm(1_200);
+        goodsForm.setItem("300 loaves of bread for the food drive");
+        Donation goods = service.donate(bakery.getId(), "in-kind", today.minusDays(5), goodsForm);
+
+        System.out.println();
+        for (Donation d : service.getDonations()) {
+            System.out.println("  " + d.getClass().getSimpleName() + " -> " + d);
         }
 
-        heading("2. Invalid donations are rejected");
-        tryRecord(service, hany.getId(), "check", DonationDetails.of(100));
-        tryRecord(service, hany.getId(), "online", DonationDetails.of(-50).reference("PAY-1"));
-        tryRecord(service, hany.getId(), "crypto", DonationDetails.of(10));
-        tryRecord(service, hany.getId(), "online", DonationDetails.of(10).reference("PAY-2").campaign("Summer Camp"));
+        title("2. Bad input is rejected");
+        tryDonate(service, hany.getId(), "check", new DonationForm(100));        // no check number
+        tryDonate(service, hany.getId(), "online", new DonationForm(-50));       // negative amount
+        tryDonate(service, hany.getId(), "crypto", new DonationForm(10));        // unknown type
+        DonationForm wrongCampaign = new DonationForm(10);
+        wrongCampaign.setReference("PAY-2");
+        wrongCampaign.setCampaign("Summer Camp");
+        tryDonate(service, hany.getId(), "online", wrongCampaign);               // campaign doesn't exist
 
-        heading("3. Campaign goal and progress");
-        service.recordDonation(hany.getId(), DonationType.ONLINE, today.minusDays(1),
-                DonationDetails.of(4_500).reference("PAY-90410").campaign("winter blankets"));
-        for (Campaign c : service.listCampaigns()) {
-            System.out.println("  " + c.summary());
+        title("3. Campaign goal and progress (client requirement)");
+        DonationForm bigGift = new DonationForm(4_500);
+        bigGift.setReference("PAY-90410");
+        bigGift.setCampaign("winter blankets"); // case doesn't matter
+        service.donate(hany.getId(), DonationType.ONLINE, today.minusDays(1), bigGift);
+        for (Campaign c : service.getCampaigns()) {
+            System.out.println("  " + c);
         }
 
-        heading("4. TEMPLATE METHOD - receipts and a tax statement, one layout");
-        System.out.println(service.receipt(online.getId(), today));
-        System.out.println(service.receipt(goods.getId(), today));
-        System.out.println(service.taxStatement(hany.getId(), 2026, today));
+        title("4. TEMPLATE METHOD - same layout, different content");
+        System.out.println(service.makeReceipt(online.getId(), today));
+        System.out.println(service.makeReceipt(goods.getId(), today));
+        System.out.println(service.makeTaxStatement(hany.getId(), 2026, today));
         try {
-            service.taxStatement(rania.getId(), 2025, today);
+            service.makeTaxStatement(rania.getId(), 2025, today);
         } catch (IllegalStateException e) {
             System.out.println("  Rejected: " + e.getMessage());
         }
 
-        heading("5. Totals and top donors");
+        title("5. Totals and top donors");
         System.out.println(service.summaryReport());
-        for (Donor d : service.topDonors(3)) {
+        for (Donor d : service.getTopDonors(3)) {
             System.out.println("  " + d.summary());
         }
 
-        heading("6. Donor records are kept while they have donations");
+        title("6. A donor who already gave can't be deleted");
         try {
-            service.removeDonor(check.getDonor().getId());
+            service.removeDonor(rania.getId());
         } catch (IllegalStateException e) {
             System.out.println("  Rejected: " + e.getMessage());
         }
-
-        heading("7. SINGLETON - one EventBus for the whole system");
-        System.out.println("  Same instance? " + (EventBus.getInstance() == bus));
     }
 
-    private static void tryRecord(DonationService service, String donorId, String type, DonationDetails details) {
+    private static void tryDonate(DonationService service, String donorId, String type, DonationForm form) {
         try {
-            service.recordDonation(donorId, type, LocalDate.of(2026, 11, 1), details);
-            System.out.println("  Accepted (unexpected)");
+            service.donate(donorId, type, LocalDate.of(2026, 11, 1), form);
+            System.out.println("  Accepted (this should not happen!)");
         } catch (IllegalArgumentException e) {
             System.out.println("  Rejected: " + e.getMessage());
         }
     }
 
-    private static void heading(String title) {
+    private static void title(String text) {
         System.out.println();
-        System.out.println("=== " + title + " ===");
+        System.out.println("=== " + text + " ===");
     }
 }
