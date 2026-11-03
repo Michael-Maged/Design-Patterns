@@ -18,8 +18,33 @@ public class Workshop extends Event {
         return EventType.WORKSHOP;
     }
 
-    public void setTopic(String topic) { this.topic = topic; }
-    public void setInstructor(String instructor) { this.instructor = instructor; }
+    public void setTopic(String topic) {
+        requireText(topic, "Workshop topic");
+        requireNotCancelled("change its topic");
+        this.topic = topic;
+    }
+
+    public void setInstructor(String instructor) {
+        requireText(instructor, "Instructor");
+        requireNotCancelled("change its instructor");
+        this.instructor = instructor;
+    }
+
+    /** Sets both together; both are checked before either changes. */
+    public void setDetails(String topic, String instructor) {
+        requireText(topic, "Workshop topic");
+        requireText(instructor, "Instructor");
+        requireNotCancelled("change its details");
+        this.topic = topic;
+        this.instructor = instructor;
+    }
+
+    private static String requireText(String value, String what) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(what + " is required");
+        }
+        return value;
+    }
     public String getTopic() { return topic; }
     public String getInstructor() { return instructor; }
 

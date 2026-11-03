@@ -14,9 +14,25 @@ import org.nonprofit.core.SystemObserver;
  * notification every time a donation is received.
  */
 public class DonationView implements SystemObserver {
-    private final Scanner in = new Scanner(System.in);
+    private final Scanner in;
 
+    /** Reads from the keyboard. */
+    public DonationView() {
+        this(new Scanner(System.in));
+    }
+
+    /** The main menu passes its own Scanner, so both screens read the same input. */
+    public DonationView(Scanner in) {
+        this.in = in;
+    }
+
+    /** The menu as the stand-alone screen shows it, with "0. Exit". */
     public int showMenu() {
+        return showMenu("Exit");
+    }
+
+    /** @param zeroLabel "Exit" for the stand-alone screen, "Back" when opened from the main menu */
+    public int showMenu(String zeroLabel) {
         System.out.println();
         System.out.println("=========== DONATIONS ===========");
         System.out.println(" 1. List donors");
@@ -29,7 +45,8 @@ public class DonationView implements SystemObserver {
         System.out.println(" 8. Print a receipt");
         System.out.println(" 9. Print a tax statement");
         System.out.println("10. Summary and top donors");
-        System.out.println(" 0. Exit");
+        System.out.println("11. Update a donor's contact details");
+        System.out.println(" 0. " + zeroLabel);
         return askNumber("Choose");
     }
 
@@ -71,6 +88,13 @@ public class DonationView implements SystemObserver {
         }
         for (Object item : items) {
             System.out.println("  " + item);
+        }
+    }
+
+    /** The messages the Communication module sent (e.g. the thank-you e-mail), one line each. */
+    public void showDeliveries(List<String> lines) {
+        for (String line : lines) {
+            System.out.println(line);
         }
     }
 

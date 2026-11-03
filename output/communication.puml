@@ -7,11 +7,44 @@ hide circle
 hide empty members
 top to bottom direction
 
-package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
-  class CommunicationService <<Observer>> {
+package "MVC: Communication screen" as mvc #FFF8E1 {
+  class CommunicationView <<View>> {
+    -in: Scanner
+    -out: PrintStream
+    --
+    +CommunicationView(in: Scanner, out: PrintStream)
+    +showMenu(zeroLabel: String): int
+    +ask(prompt: String): String
+    +askNumber(prompt: String): int
+    +showLog(log: List<SentMessage>): void
+    +showMessage(message: String): void
+    +showDeliveries(lines: List<String>): void
+    +showError(message: String): void
+  }
+
+  class CommunicationController <<Controller>> {
+    -service: CommunicationService
+    -view: CommunicationView
+    -embedded: boolean
+    -groupMembers: Function<String, List<? extends Person>>
+    -findPerson: Function<String, Person>
+    -eventAudience: Function<String, Audience>
+    --
+    +CommunicationController(service, view, embedded: boolean, groupMembers, findPerson, eventAudience)
+    +run(): void
+    -broadcast(): void
+    -sendToPerson(): void
+    -messageEventAttendees(): void
+    -askId(prompt: String): String
+  }
+}
+
+package "OBSERVER role: module entry point" as entry #EEF7EE {
+  class CommunicationService <<Model>> <<Observer>> {
     -organisation: String
     -selector: ChannelSelector
     -log: List<SentMessage>
+    -outbox: List<String>
     --
     +CommunicationService(organisation: String)
     +onEvent(event: SystemEvent): void
@@ -20,6 +53,7 @@ package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
     +send(recipient: Person, subject: String, text: String, urgent: boolean, forced: ContactPreference): boolean
     ~compose(text: String, urgent: boolean, channel: CommunicationChannel): String
     +getLog(): List<SentMessage>
+    +takeOutput(): List<String>
   }
 
   class SentMessage {
@@ -34,18 +68,20 @@ package "OBSERVER + FACADE role: module entry point" as entry #EEF7EE {
 
 package "STRATEGY: how a message is delivered" as strategy #EEF3FB {
   interface CommunicationChannel <<Strategy>> {
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class EmailChannel {
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class SmsChannel {
     ~{static} MAX_LENGTH: int = 160
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
   }
 
@@ -53,8 +89,9 @@ package "STRATEGY: how a message is delivered" as strategy #EEF3FB {
     -platform: String
     --
     +SocialMediaChannel(platform: String)
-    +send(message: Message): void
+    +send(message: Message): String
     +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
   }
 
   class ChannelSelector {
@@ -120,7 +157,24 @@ package "From core (see core.puml)" as core #F5F5F5 {
 }
 
 hide core members
+mvc -[hidden]down- entry
 core -[hidden]down- strategy
+
+CommunicationController --> "1" CommunicationView : view
+CommunicationController --> "1" CommunicationService : model
+CommunicationController ..> Person : groupMembers / findPerson
+CommunicationController ..> Audience : eventAudience
+CommunicationView ..> SentMessage : showLog
+
+note right of CommunicationController
+  MVC: CommunicationView (View), CommunicationController
+  (Controller), CommunicationService (Model).
+  Menu: 1 broadcast to a group, 2 one person (any id),
+  3 attendees of one event, 4 message log.
+  The three look-ups are wired by App to DataStore and
+  return only core types (Person, Audience), so this
+  module imports no other module.
+end note
 
 CommunicationService ..|> SystemObserver
 CommunicationService --> EventBus : subscribes to every topic
@@ -151,6 +205,17 @@ note right of ChannelSelector
   Picks the channel from the person's
   preferred contact; falls back to one
   they have details for.
+end note
+
+CommunicationChannel ..> MessageContent : decorate()
+
+note right of CommunicationChannel
+  Each channel decides its own decorations:
+  decorate() adds nothing by default; Email adds
+  Signature + Footer, SocialMedia adds Signature.
+  send() returns the delivered text (nothing is
+  printed); CommunicationService keeps it in the
+  outbox and a view prints takeOutput().
 end note
 
 note bottom of ContentDecorator

@@ -1,0 +1,826 @@
+@startuml overall
+' Whole system (CSE336 non-profit management system): overall class diagram with every design pattern marked.
+' Written by hand from the source in SDP/src (all org.nonprofit packages plus App.java); the UML generator was not used.
+' Only the important fields and methods are shown. Left out on purpose: demo classes (*Demo, SystemDemo,
+' VolunteerApp, DonationApp; SampleData is shown only as App's loader), trivial getters/setters, private helpers, id counters, and minor value types
+' (HourEntry, WaitlistEntry, EventChange, RegistrationResult, Campaign, SentMessage, Message, DonationType, Urgency).
+' The per-module diagrams (core, donation, volunteer, event, beneficiary, communication .puml) have the full detail.
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam nodesep 30
+skinparam ranksep 45
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #B0A060
+skinparam linetype ortho
+hide circle
+hide empty members
+left to right direction
+
+' ============================================================ entry point
+class App {
+  +{static} main(args: String[]): void
+}
+
+' ============================================================ app
+package "org.nonprofit.app" as app #FFF3E0 {
+  class MainMenuController <<Controller>> {
+    -view: MainMenuView
+    -donationScreen: DonationController
+    -volunteerScreen: VolunteerController
+    -eventScreen: EventController
+    -beneficiaryScreen: BeneficiaryController
+    -communicationScreen: CommunicationController
+    --
+    +run(): void
+  }
+
+  class MainMenuView <<View>> {
+    +showMainMenu(): int
+    +showMessage(message: String): void
+    +showError(message: String): void
+  }
+
+  class DataStore <<Singleton>> {
+    +{static} ORGANISATION: String
+    -{static} instance: DataStore
+    --
+    -DataStore()
+    +{static} getInstance(): DataStore
+    +getDonationService(): DonationService
+    +membersOf(group: BroadcastGroup): List<? extends Person>
+    +membersOf(groupName: String): List<? extends Person>
+    +findPerson(personId: String): Person
+    +eventAudience(eventId: String): Audience
+  }
+
+  class SampleData {
+    +{static} load(store: DataStore): void
+  }
+
+  enum BroadcastGroup {
+    DONORS
+    VOLUNTEERS
+    BENEFICIARIES
+    ATTENDEES
+  }
+
+  note top of DataStore
+    <b>SINGLETON</b>: DataStore (lazy, double-checked locking).
+    Owns exactly one of each service so every screen
+    shares the same data and every EventBus message is sent once.
+    Its constructor wires the urgent responders: BeneficiaryService
+    gets an Audience of the current volunteers.
+  end note
+
+  note right of MainMenuController
+    <b>MVC</b>: MainMenuView (View) / MainMenuController (Controller).
+    Options 1-5 open the five module screens (each its own
+    View + Controller over its service from DataStore, the Model);
+    0 exits. App builds the screens with one shared Scanner.
+  end note
+}
+
+' ============================================================ core
+package "org.nonprofit.core" as core #F5F5F5 {
+  abstract class Person {
+    -id: String
+    -name: String
+    -email: String
+    -phone: String
+    -preferredContact: ContactPreference
+    --
+    +updateContact(name: String, email: String, phone: String, preferredContact: ContactPreference): void
+  }
+
+  enum ContactPreference {
+    EMAIL
+    SMS
+    SOCIAL_MEDIA
+  }
+
+  interface Audience {
+    +getAudience(): List<? extends Person>
+  }
+
+  class EventBus <<Singleton>> <<Subject>> {
+    -{static} instance: EventBus
+    -subscribers: Map<SystemEventType, List<SystemObserver>>
+    --
+    -EventBus()
+    +{static} getInstance(): EventBus
+    +subscribe(type: SystemEventType, observer: SystemObserver): void
+    +publish(event: SystemEvent): void
+  }
+
+  interface SystemObserver <<Observer>> {
+    +onEvent(event: SystemEvent): void
+  }
+
+  class SystemEvent {
+    -type: SystemEventType
+    -message: String
+    -recipient: Person
+    -source: Object
+  }
+
+  enum SystemEventType {
+    DONATION_RECEIVED
+    VOLUNTEER_ASSIGNED
+    URGENT_NEED
+    EVENT_UPDATED
+    ...
+  }
+
+  note bottom of EventBus
+    <b>SINGLETON + OBSERVER</b>: EventBus (Subject, getInstance()),
+    SystemObserver (Observer), SystemEvent (message).
+    Services publish; CommunicationService subscribes to every type,
+    DonationView to DONATION_RECEIVED, VolunteerView to VOLUNTEER_ASSIGNED.
+  end note
+}
+
+' ============================================================ donation
+package "org.nonprofit.donation" as donation #E8F5E9 {
+  class DonationController <<Controller>> {
+    -service: DonationService
+    -view: DonationView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +run(): void
+  }
+
+  class DonationView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +ask(question: String): String
+    +showDeliveries(lines: List<String>): void
+    +onEvent(event: SystemEvent): void
+  }
+
+  class DonationService <<Model>> {
+    -donors: Map<String, Donor>
+    -donations: Map<String, Donation>
+    -campaigns: Map<String, Campaign>
+    -creators: Map<DonationType, DonationCreator>
+    --
+    +addDonor(name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
+    +updateDonor(donorId: String, name: String, email: String, phone: String, preferredContact: ContactPreference): Donor
+    +removeDonor(donorId: String): void
+    +getDonors(): List<Donor>
+    +addCampaign(name: String, goal: double): Campaign
+    +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm): Donation
+    +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm, today: LocalDate): Donation
+    +donate(donorId: String, typeText: String, date: LocalDate, form: DonationForm): Donation
+    +getTopDonors(howMany: int): List<Donor>
+    +summaryReport(): String
+    +makeReceipt(donationId: String, issueDate: LocalDate): String
+    +makeTaxStatement(donorId: String, year: int, issueDate: LocalDate): String
+  }
+
+  class Donor {
+    -donations: List<Donation>
+    --
+    +getDonationsIn(year: int): List<Donation>
+    +getTotalGiven(): double
+    +summary(): String
+  }
+
+  abstract class DonationCreator <<Creator>> {
+    +receive(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation {final}
+    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation
+    +{abstract} getType(): DonationType
+  }
+  class OnlineDonationCreator <<ConcreteCreator>>
+  class CheckDonationCreator <<ConcreteCreator>>
+  class InKindDonationCreator <<ConcreteCreator>>
+
+  abstract class Donation <<Product>> {
+    -id: String
+    -donor: Donor
+    -amount: double
+    -date: LocalDate
+    --
+    +{abstract} getType(): DonationType
+    +{abstract} getDetails(): String
+  }
+  class OnlineDonation <<ConcreteProduct>>
+  class CheckDonation <<ConcreteProduct>>
+  class InKindDonation <<ConcreteProduct>>
+
+  class DonationForm {
+    -amount: double
+    -reference: String
+    -bank: String
+    -item: String
+    -monthly: boolean
+    -campaign: String
+  }
+
+  abstract class DonationDocument <<AbstractClass>> {
+    -issueDate: LocalDate
+    --
+    +generate(): String {final}
+    #{abstract} getTitle(): String
+    #{abstract} body(): String
+    #{abstract} totals(): String
+    #canBeIssued(): boolean
+  }
+  class DonationReceipt <<ConcreteClass>>
+  class TaxStatement <<ConcreteClass>>
+
+  note top of DonationController
+    <b>MVC</b>: DonationView (View, also a SystemObserver),
+    DonationController (Controller), DonationService (Model).
+  end note
+
+  note bottom of DonationCreator
+    <b>FACTORY METHOD</b>: DonationCreator (Creator) with final
+    receive() calling createDonation(); Online/Check/InKind
+    creators (ConcreteCreator) build the matching Donation (Product).
+  end note
+
+  note bottom of DonationDocument
+    <b>TEMPLATE METHOD</b>: generate() is final:
+    header -> body -> totals -> footer.
+    DonationReceipt, TaxStatement fill the steps.
+  end note
+}
+
+' ============================================================ volunteer
+package "org.nonprofit.volunteer" as volunteer #E3F2FD {
+  class VolunteerController <<Controller>> {
+    -service: VolunteerService
+    -view: VolunteerView
+    -embedded: boolean
+    --
+    +run(): void
+  }
+
+  class VolunteerView <<View>> {
+    +showMenu(currentRule: String, zeroLabel: String): int
+    +ask(prompt: String): String
+    +onEvent(event: SystemEvent): void
+  }
+
+  class VolunteerService <<Model>> <<Context>> {
+    -volunteers: Map<String, Volunteer>
+    -tasks: Map<String, Task>
+    -strategy: AssignmentStrategy
+    -bus: EventBus
+    --
+    +updateTask(taskId: String, name: String, requiredSkill: String, day: DayOfWeek, category: String, eventName: String): Task
+    +setStrategy(mode: AssignmentMode): void
+    +assign(taskId: String): Volunteer
+    +logHours(taskId: String, hours: double, date: LocalDate): void
+    +issueHoursCertificate(volunteerId: String, date: LocalDate): String
+  }
+
+  class Volunteer {
+    -skills: Set<String>
+    -availability: Set<DayOfWeek>
+    -tasks: List<Task>
+    --
+    +getTotalHours(): double
+  }
+
+  class Task {
+    -requiredSkill: String
+    -day: DayOfWeek
+    -assignedVolunteer: Volunteer
+  }
+
+  interface AssignmentStrategy <<Strategy>> {
+    +pick(task: Task, candidates: List<Volunteer>): Volunteer
+    +name(): String
+  }
+  class SkillBasedAssignment <<ConcreteStrategy>>
+  class AvailabilityBasedAssignment <<ConcreteStrategy>>
+  class PreferenceBasedAssignment <<ConcreteStrategy>>
+
+  enum AssignmentMode {
+    SKILL
+    AVAILABILITY
+    PREFERENCE
+    --
+    +create(): AssignmentStrategy
+  }
+
+  abstract class Certificate <<AbstractClass>> {
+    #volunteer: Volunteer
+    --
+    +issue(): String
+    #{abstract} title(): String
+    #{abstract} achievement(): String
+    #isEligible(): boolean
+  }
+  class HoursCertificate <<ConcreteClass>>
+  class EventParticipationCertificate <<ConcreteClass>>
+
+  note top of VolunteerController
+    <b>MVC</b>: VolunteerView (View, also a SystemObserver),
+    VolunteerController (Controller), VolunteerService (Model).
+  end note
+
+  note bottom of AssignmentStrategy
+    <b>STRATEGY</b>: VolunteerService (Context) -> AssignmentStrategy;
+    Skill / Availability / Preference based; AssignmentMode creates them.
+  end note
+
+  note bottom of Certificate
+    <b>TEMPLATE METHOD</b>: issue() is final;
+    HoursCertificate, EventParticipationCertificate.
+  end note
+}
+
+' ============================================================ event
+package "org.nonprofit.event" as event #F3E5F5 {
+  class EventController <<Controller>> {
+    -service: EventService
+    -view: EventView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +run(): void
+  }
+
+  class EventView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +showEditMenu(title: String): int
+    +ask(prompt: String): String
+    +showDeliveries(lines: List<String>): void
+    +showInbox(attendeeName: String, notes: List<String>): void
+  }
+
+  class EventService <<Model>> {
+    -events: Map<String, Event>
+    -attendees: Map<String, Attendee>
+    -busNotifier: EventObserver
+    -bus: EventBus
+    --
+    +createEvent(type: EventType, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
+    +addAttendee(attendee: Attendee): Attendee
+    +findAttendee(attendeeId: String): Attendee
+    +listAttendees(): List<Attendee>
+    +register(eventId: String, attendee: Attendee, now: LocalDateTime, addOns: TicketAddOn...): RegistrationResult
+    +cancelRegistration(eventId: String, attendee: Attendee): boolean
+    +upcomingEvents(now: LocalDateTime): List<Event>
+    +sendReminder(eventId: String, now: LocalDateTime): void
+    +cancelEvent(eventId: String): void
+    +deleteEvent(eventId: String): void
+  }
+
+  class EventFactory <<SimpleFactory>> {
+    -EventFactory()
+    +{static} create(type: EventType, name: String, dateTime: LocalDateTime, location: String, capacity: int): Event
+  }
+
+  enum EventType {
+    FUNDRAISER
+    WORKSHOP
+    OUTREACH
+  }
+
+  abstract class Event <<ConcreteSubject>> {
+    -capacity: int
+    -registrations: Map<Attendee, Ticket>
+    -observers: List<EventObserver>
+    --
+    +registerObserver(observer: EventObserver): void
+    +removeObserver(observer: EventObserver): void
+    #notifyObservers(change: EventChange, message: String): void
+    +cancel(): void
+    +getAudience(): List<Attendee>
+    +{abstract} getType(): EventType
+  }
+  class Fundraiser
+  class Workshop
+  class OutreachProgram
+
+  interface EventSubject <<Subject>> {
+    +registerObserver(observer: EventObserver): void
+    +removeObserver(observer: EventObserver): void
+  }
+
+  interface EventObserver <<Observer>> {
+    +update(event: Event, change: EventChange, message: String): void
+  }
+
+  class Attendee <<ConcreteObserver>> {
+    -inbox: List<String>
+    --
+    +update(event: Event, change: EventChange, message: String): void
+  }
+
+  class EventBusNotifier <<ConcreteObserver>> {
+    +update(event: Event, change: EventChange, message: String): void
+  }
+
+  interface Ticket <<Component>> {
+    +price(): double
+    +description(): String
+  }
+
+  class BasicTicket <<ConcreteComponent>> {
+    -event: Event
+    -holder: Attendee
+  }
+
+  abstract class TicketDecorator <<Decorator>> {
+    #wrapped: Ticket
+    --
+    +price(): double
+    +description(): String
+  }
+  class VipTicket <<ConcreteDecorator>>
+  class MealTicket <<ConcreteDecorator>>
+  class ParkingTicket <<ConcreteDecorator>>
+
+  enum TicketAddOn {
+    VIP
+    MEAL
+    PARKING
+    --
+    +applyTo(ticket: Ticket): Ticket
+  }
+
+  note top of EventController
+    <b>MVC</b>: EventView (View), EventController (Controller),
+    EventService (Model). After each action the view shows
+    what Communication sent and the attendees' new inbox notes.
+  end note
+
+  note top of EventFactory
+    <b>SIMPLE FACTORY</b>: EventFactory.create(EventType, ...)
+    returns Fundraiser / Workshop / OutreachProgram
+    (their constructors are package-private).
+  end note
+
+  note bottom of EventObserver
+    <b>OBSERVER</b> (events): EventSubject (Subject: registerObserver/
+    removeObserver), Event (ConcreteSubject, notifyObservers),
+    EventObserver (update); Attendee and EventBusNotifier (package-private)
+    are ConcreteObservers. EventBusNotifier forwards changes to EventBus.
+  end note
+
+  note bottom of TicketDecorator
+    <b>DECORATOR</b>: Ticket (Component), BasicTicket,
+    TicketDecorator wraps a Ticket; Vip / Meal / Parking
+    add to price() and description(). TicketAddOn applies them.
+  end note
+}
+
+' ============================================================ beneficiary
+package "org.nonprofit.beneficiary" as beneficiary #E0F2F1 {
+  class BeneficiaryController <<Controller>> {
+    -service: BeneficiaryService
+    -view: BeneficiaryView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +run(): void
+  }
+
+  class BeneficiaryView <<View>> {
+    +showMenu(currentRule: String, zeroLabel: String): int
+    +ask(prompt: String): String
+    +showDeliveries(lines: List<String>): void
+  }
+
+  class BeneficiaryService <<Model>> <<Context>> {
+    -strategy: AllocationStrategy
+    -urgentResponders: Audience
+    -bus: EventBus
+    --
+    +addNeed(beneficiaryId: String, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate): Need
+    +updateNeed(needId: String, quantity: int, urgency: Urgency): Need
+    +setStrategy(mode: AllocationMode): void
+    +distribute(program: String, category: String, available: int, date: LocalDate): List<Distribution>
+    +programImpactReport(program: String, date: LocalDate): String
+  }
+
+  class Beneficiary {
+    -area: String
+    -householdSize: int
+    -needs: List<Need>
+    --
+    +openNeeds(): List<Need>
+  }
+
+  class Need {
+    -category: String
+    -quantity: int
+    -urgency: Urgency
+    -received: int
+    --
+    +remaining(): int
+  }
+
+  class Distribution {
+    -need: Need
+    -quantity: int
+    -program: String
+  }
+
+  interface AllocationStrategy <<Strategy>> {
+    +allocate(needs: List<Need>, available: int): Map<Need, Integer>
+    +name(): String
+  }
+  class UrgencyFirstAllocation <<ConcreteStrategy>>
+  class FirstComeFirstServedAllocation <<ConcreteStrategy>>
+  class EqualShareAllocation <<ConcreteStrategy>>
+
+  enum AllocationMode {
+    URGENCY
+    FIRST_COME
+    EQUAL
+    --
+    +create(): AllocationStrategy
+  }
+
+  abstract class ImpactReport <<AbstractClass>> {
+    #reportDate: LocalDate
+    --
+    +generate(): String
+    #{abstract} collectData(): void
+    #{abstract} computeMetrics(): Map<String, String>
+    #{abstract} formatRows(): List<String>
+  }
+  class ProgramImpactReport <<ConcreteClass>>
+  class BeneficiaryProgressReport <<ConcreteClass>>
+
+  note top of BeneficiaryController
+    <b>MVC</b>: BeneficiaryView (View), BeneficiaryController
+    (Controller), BeneficiaryService (Model).
+  end note
+
+  note bottom of AllocationStrategy
+    <b>STRATEGY</b>: BeneficiaryService (Context) -> AllocationStrategy;
+    UrgencyFirst / FirstComeFirstServed / EqualShare; AllocationMode creates them.
+  end note
+
+  note bottom of ImpactReport
+    <b>TEMPLATE METHOD</b>: generate() is final:
+    collectData -> hasData -> computeMetrics -> formatRows -> summary.
+    ProgramImpactReport, BeneficiaryProgressReport.
+  end note
+}
+
+' ============================================================ communication
+package "org.nonprofit.communication" as communication #FFFDE7 {
+  class CommunicationController <<Controller>> {
+    -service: CommunicationService
+    -view: CommunicationView
+    -embedded: boolean
+    -groupMembers: Function<String, List<? extends Person>>
+    -findPerson: Function<String, Person>
+    -eventAudience: Function<String, Audience>
+    --
+    +run(): void
+  }
+
+  class CommunicationView <<View>> {
+    +showMenu(zeroLabel: String): int
+    +ask(prompt: String): String
+    +showLog(log: List<SentMessage>): void
+    +showDeliveries(lines: List<String>): void
+  }
+
+  class CommunicationService <<Model>> <<Observer>> {
+    -organisation: String
+    -selector: ChannelSelector
+    --
+    +onEvent(event: SystemEvent): void
+    +broadcast(recipients: Collection<? extends Person>, subject: String, text: String, urgent: boolean, forced: ContactPreference): int
+    +send(recipient: Person, subject: String, text: String, urgent: boolean, forced: ContactPreference): boolean
+    ~compose(text: String, urgent: boolean, channel: CommunicationChannel): String
+    +takeOutput(): List<String>
+  }
+
+  class ChannelSelector {
+    +channelFor(person: Person): CommunicationChannel
+    +channelFor(preference: ContactPreference): CommunicationChannel
+  }
+
+  interface CommunicationChannel <<Strategy>> {
+    +send(message: Message): String
+    +name(): String
+    +decorate(content: MessageContent, organisation: String): MessageContent
+  }
+  class EmailChannel <<ConcreteStrategy>>
+  class SmsChannel <<ConcreteStrategy>>
+  class SocialMediaChannel <<ConcreteStrategy>> {
+    -platform: String
+  }
+
+  interface MessageContent <<Component>> {
+    +render(): String
+  }
+  class PlainContent <<ConcreteComponent>> {
+    -text: String
+  }
+  abstract class ContentDecorator <<Decorator>> {
+    #wrapped: MessageContent
+    --
+    +render(): String
+  }
+  class UrgentTagDecorator <<ConcreteDecorator>>
+  class SignatureDecorator <<ConcreteDecorator>> {
+    -organisation: String
+  }
+  class FooterDecorator <<ConcreteDecorator>>
+
+  note top of CommunicationController
+    <b>MVC</b>: CommunicationView (View), CommunicationController
+    (Controller), CommunicationService (Model). The people to write
+    to come from look-ups App wires to DataStore (core types only:
+    Person, Audience), so this module imports no other module.
+  end note
+
+  note bottom of CommunicationChannel
+    <b>STRATEGY</b>: CommunicationChannel; ChannelSelector picks
+    Email / Sms / SocialMedia from the person's ContactPreference.
+  end note
+
+  note bottom of ContentDecorator
+    <b>DECORATOR</b>: MessageContent (Component), PlainContent;
+    UrgentTag / Signature / Footer decorators wrap the text in compose().
+  end note
+}
+
+' ============================================================ relationships: app layer
+App ..> DataStore : getInstance()
+App ..> MainMenuController : <<creates>> / run()
+App ..> MainMenuView : <<creates>>
+App ..> DonationController : <<creates>>
+App ..> DonationView : <<creates>>
+App ..> VolunteerController : <<creates>>
+App ..> VolunteerView : <<creates>>
+App ..> EventController : <<creates>>
+App ..> EventView : <<creates>>
+App ..> BeneficiaryController : <<creates>>
+App ..> BeneficiaryView : <<creates>>
+App ..> CommunicationController : <<creates>> (look-ups from DataStore)
+App ..> CommunicationView : <<creates>>
+App ..> SampleData : load(store)
+SampleData ..> DataStore
+MainMenuController --> MainMenuView
+MainMenuController --> DonationController : opens Donations screen (Back)
+MainMenuController --> VolunteerController : opens Volunteers screen (Back)
+MainMenuController --> EventController : opens Events screen (Back)
+MainMenuController --> BeneficiaryController : opens Beneficiaries screen (Back)
+MainMenuController --> CommunicationController : opens Communication screen (Back)
+DataStore ..> BroadcastGroup
+DataStore *-- "1" DonationService
+DataStore *-- "1" VolunteerService
+DataStore *-- "1" EventService
+DataStore *-- "1" BeneficiaryService : ctor wires urgentResponders
+DataStore *-- "1" CommunicationService
+
+' ============================================================ relationships: core
+EventBus o-- "*" SystemObserver : subscribers
+EventBus ..> SystemEvent : delivers
+SystemEvent --> SystemEventType
+SystemEvent --> Person : recipient
+Person --> ContactPreference
+
+' Person subclasses (cross-package inheritance)
+Donor -down-|> Person
+Volunteer -down-|> Person
+Attendee -down-|> Person
+Beneficiary -down-|> Person
+
+' Observer on the system bus
+CommunicationService .down.|> SystemObserver
+DonationView .down.|> SystemObserver
+VolunteerView .down.|> SystemObserver
+DonationService ..> EventBus : publish
+VolunteerService ..> EventBus : publish
+EventService ..> EventBus : publish
+BeneficiaryService ..> EventBus : publish
+EventBusNotifier ..> EventBus : publish
+CommunicationService ..> EventBus : subscribe(all types)
+DonationController ..> EventBus : subscribe(view)
+VolunteerController ..> EventBus : subscribe(view)
+Event .down.|> Audience
+BeneficiaryService --> Audience : urgentResponders
+CommunicationService ..> Audience : broadcast to source audience
+CommunicationController ..> Person : groupMembers / findPerson
+CommunicationController ..> Audience : eventAudience
+
+' ============================================================ relationships: donation
+DonationController --> DonationService : model
+DonationController --> DonationView
+DonationService o-- "*" Donor
+DonationService o-- "3" DonationCreator : creators
+DonationCreator <|-- OnlineDonationCreator
+DonationCreator <|-- CheckDonationCreator
+DonationCreator <|-- InKindDonationCreator
+DonationCreator ..> Donation : <<creates>>
+DonationCreator ..> DonationForm : reads
+Donation <|-- OnlineDonation
+Donation <|-- CheckDonation
+Donation <|-- InKindDonation
+Donor "1" -- "*" Donation
+DonationDocument <|-- DonationReceipt
+DonationDocument <|-- TaxStatement
+DonationService ..> DonationDocument : <<issues>>
+
+' ============================================================ relationships: volunteer
+VolunteerController --> VolunteerService : model
+VolunteerController --> VolunteerView
+VolunteerService o-- "*" Volunteer
+VolunteerService o-- "*" Task
+VolunteerService --> AssignmentStrategy
+AssignmentStrategy <|.. SkillBasedAssignment
+AssignmentStrategy <|.. AvailabilityBasedAssignment
+AssignmentStrategy <|.. PreferenceBasedAssignment
+AssignmentMode ..> AssignmentStrategy : <<creates>>
+Volunteer "0..1" -- "*" Task : assigned
+Certificate <|-- HoursCertificate
+Certificate <|-- EventParticipationCertificate
+Certificate --> Volunteer
+VolunteerService ..> Certificate : <<issues>>
+
+' ============================================================ relationships: event
+EventController --> EventService : model
+EventController --> EventView
+EventService o-- "*" Event
+EventService o-- "*" Attendee : attendees on file
+EventService ..> EventFactory : create
+EventService --> EventBusNotifier : busNotifier
+EventService ..> TicketAddOn : wraps BasicTicket
+EventService ..> BasicTicket : <<creates>>
+EventFactory ..> EventType
+EventFactory ..> Event : <<creates>>
+Event <|-- Fundraiser
+Event <|-- Workshop
+Event <|-- OutreachProgram
+EventSubject <|.. Event
+Event o-- "*" EventObserver : observers
+EventObserver <|.. Attendee
+EventObserver <|.. EventBusNotifier
+Event o-- "*" Ticket : registrations
+Ticket <|.. BasicTicket
+Ticket <|.. TicketDecorator
+TicketDecorator o-- "1" Ticket : wrapped
+TicketDecorator <|-- VipTicket
+TicketDecorator <|-- MealTicket
+TicketDecorator <|-- ParkingTicket
+TicketAddOn ..> TicketDecorator : applyTo() wraps
+
+' ============================================================ relationships: beneficiary
+BeneficiaryController --> BeneficiaryService : model
+BeneficiaryController --> BeneficiaryView
+BeneficiaryService o-- "*" Beneficiary
+BeneficiaryService --> AllocationStrategy
+AllocationStrategy <|.. UrgencyFirstAllocation
+AllocationStrategy <|.. FirstComeFirstServedAllocation
+AllocationStrategy <|.. EqualShareAllocation
+AllocationMode ..> AllocationStrategy : <<creates>>
+Beneficiary "1" *-- "*" Need
+Distribution --> Need
+ImpactReport <|-- ProgramImpactReport
+ImpactReport <|-- BeneficiaryProgressReport
+BeneficiaryService ..> ImpactReport : <<issues>>
+
+' ============================================================ relationships: communication
+CommunicationController --> CommunicationService : model
+CommunicationController --> CommunicationView
+CommunicationService --> ChannelSelector
+ChannelSelector --> "3" CommunicationChannel
+CommunicationChannel <|.. EmailChannel
+CommunicationChannel <|.. SmsChannel
+CommunicationChannel <|.. SocialMediaChannel
+CommunicationService ..> MessageContent : compose()
+MessageContent <|.. PlainContent
+MessageContent <|.. ContentDecorator
+ContentDecorator o-- "1" MessageContent : wrapped
+ContentDecorator <|-- UrgentTagDecorator
+ContentDecorator <|-- SignatureDecorator
+ContentDecorator <|-- FooterDecorator
+
+' ============================================================ pattern notes
+
+
+
+note as dependencyRule
+  <b>Module rule</b>: feature packages (donation, volunteer, event,
+  beneficiary, communication) depend only on <b>core</b>,
+  never on each other. Only <b>app</b> (DataStore,
+  SampleData, SystemDemo) and App know all of them;
+  MainMenuController knows only the five screens.
+end note
+
+
+
+
+
+
+
+
+
+
+
+
+
+@enduml

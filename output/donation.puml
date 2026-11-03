@@ -139,9 +139,11 @@ package "MODEL: service, donors and campaigns" as model #F3EEF8 {
     +addCreator(creator: DonationCreator): void
     +getCreator(type: DonationType): DonationCreator
     +addDonor(name, email, phone, contact): Donor
+    +updateDonor(donorId, name, email, phone, contact): Donor
     +removeDonor(donorId: String): void
     +addCampaign(name: String, goal: double): Campaign
     +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm): Donation
+    +donate(donorId: String, type: DonationType, date: LocalDate, form: DonationForm, today: LocalDate): Donation
     +donate(donorId: String, typeText: String, date: LocalDate, form: DonationForm): Donation
     +getTotalRaised(): double
     +getTotalFor(type: DonationType): double
@@ -175,12 +177,21 @@ package "MVC: console screen" as mvc #EEF7EE {
     +{static} main(args: String[]): void
   }
   class DonationController <<Controller>> {
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +DonationController(service: DonationService, view: DonationView)
+    +DonationController(service, view, embedded: boolean, deliveries: Supplier<List<String>>)
     +run(): void
   }
   class DonationView <<View>> {
+    +DonationView()
+    +DonationView(in: Scanner)
     +showMenu(): int
+    +showMenu(zeroLabel: String): int
     +ask(question: String): String
     +showList(title: String, items: List): void
+    +showDeliveries(lines: List<String>): void
     +onEvent(event: SystemEvent): void
   }
   class DonationDemo {

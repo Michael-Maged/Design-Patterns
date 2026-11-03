@@ -1,17 +1,19 @@
 package org.nonprofit.volunteer;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * Entry point of the Volunteers module (the Facade in core calls this).
+ * Entry point of the Volunteers module (the Volunteers screen, {@link VolunteerController}, calls this).
  * Keeps volunteers and tasks, assigns tasks using the current
  * {@link AssignmentStrategy}, logs hours, ranks volunteers and issues
  * {@link Certificate}s.
@@ -52,6 +54,67 @@ public class VolunteerService {
         return true;
     }
 
+    /** Changes a volunteer's contact details; a blank name is refused and changes nothing. */
+    public Volunteer updateVolunteerContact(String volunteerId, String name, String email, String phone,
+                                            ContactPreference preferredContact) {
+        Volunteer volunteer = requireVolunteer(volunteerId);
+        volunteer.updateContact(name, email, phone, preferredContact);
+        return volunteer;
+    }
+
+    // ---- Profile changes ----
+    // Removals go through these methods, not straight to the Volunteer, so a
+    // volunteer cannot lose a day or skill an unfinished task depends on.
+    // Every assignment rule needs the volunteer to be available on the task's
+    // day, and the task states the skill it needs (the skill-based rule, the
+    // default, requires it). Preferences only steer who gets picked, so
+    // removing one never affects a task that is already assigned.
+
+    public Volunteer addSkill(String volunteerId, String skill) {
+        return requireVolunteer(volunteerId).addSkill(skill);
+    }
+
+    /** Refused while the volunteer has an unfinished task that needs this skill. */
+    public Volunteer removeSkill(String volunteerId, String skill) {
+        Volunteer volunteer = requireVolunteer(volunteerId);
+        String wanted = Volunteer.normalizeSkill(skill);
+        for (Task task : volunteer.getTasks()) {
+            if (!task.isCompleted() && task.getRequiredSkill().equals(wanted)) {
+                throw new IllegalStateException(volunteer.getName() + " is assigned to " + task.getName()
+                        + ", which needs " + wanted + "; unassign or finish that task first");
+            }
+        }
+        return volunteer.removeSkill(skill);
+    }
+
+    public Volunteer addAvailability(String volunteerId, DayOfWeek day) {
+        Volunteer volunteer = requireVolunteer(volunteerId);
+        return volunteer.addAvailability(day);
+    }
+
+    /** Refused while the volunteer has an unfinished task on that day. */
+    public Volunteer removeAvailability(String volunteerId, DayOfWeek day) {
+        Volunteer volunteer = requireVolunteer(volunteerId);
+        if (day == null) {
+            throw new IllegalArgumentException("Day is required");
+        }
+        for (Task task : volunteer.getTasks()) {
+            if (!task.isCompleted() && task.getDay() == day) {
+                throw new IllegalStateException(volunteer.getName() + " is assigned to " + task.getName()
+                        + " on " + day + "; unassign or finish that task first");
+            }
+        }
+        return volunteer.removeAvailability(day);
+    }
+
+    public Volunteer addPreference(String volunteerId, String category) {
+        return requireVolunteer(volunteerId).addPreference(category);
+    }
+
+    public Volunteer removePreference(String volunteerId, String category) {
+        return requireVolunteer(volunteerId).removePreference(category);
+    }
+
     // ---- Tasks ----
 
     public Task addTask(Task task) {
@@ -79,6 +142,41 @@ public class VolunteerService {
         }
         unassign(taskId);
         tasks.remove(taskId);
+    }
+
+    /**
+     * Changes a task that has not been done yet. If it is assigned, the
+     * change is refused when its volunteer would no longer fit: a new day
+     * they are not available on or already busy on, or a new skill they do
+     * not have. Everything is checked before anything changes.
+     */
+    public Task updateTask(String taskId, String name, String requiredSkill, DayOfWeek day,
+                           String category, String eventName) {
+        Task task = requireTask(taskId);
+        if (task.isCompleted()) {
+            throw new IllegalStateException(task.getName() + " is completed and its hours are on record, so it cannot be changed");
+        }
+        Task.check(name, requiredSkill, day, category);
+        Volunteer volunteer = task.getAssignedVolunteer();
+        if (volunteer != null) {
+            if (day != task.getDay()) {
+                if (!volunteer.isAvailableOn(day)) {
+                    throw new IllegalStateException(volunteer.getName() + " is not available on " + day
+                            + "; unassign " + task.getName() + " first");
+                }
+                if (volunteer.isBookedOn(day)) {
+                    throw new IllegalStateException(volunteer.getName() + " already has a task on " + day
+                            + "; unassign " + task.getName() + " first");
+                }
+            }
+            String skill = Volunteer.normalizeSkill(requiredSkill);
+            if (!skill.equals(task.getRequiredSkill()) && !volunteer.hasSkill(skill)) {
+                throw new IllegalStateException(volunteer.getName() + " does not have the skill " + skill
+                        + "; unassign " + task.getName() + " first");
+            }
+        }
+        task.update(name, requiredSkill, day, category, eventName);
+        return task;
     }
 
     public List<Task> openTasks() {
@@ -183,9 +281,12 @@ public class VolunteerService {
         if (task.isCompleted()) {
             throw new IllegalStateException("Hours for " + task.getName() + " were already logged");
         }
-        // NaN ("not a number") would slip past "hours <= 0", so it is checked too.
-        if (Double.isNaN(hours) || hours <= 0) {
+        // NaN ("not a number") and Infinity would slip past "hours <= 0", so they are checked too.
+        if (!Double.isFinite(hours) || hours <= 0) {
             throw new IllegalArgumentException("Hours must be a positive number");
+        }
+        if (date == null) {
+            throw new IllegalArgumentException("Date is required");
         }
         task.getAssignedVolunteer().recordHours(new HourEntry(task, hours, date));
         task.markCompleted();

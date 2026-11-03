@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Supplier;
 
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
@@ -15,23 +16,48 @@ import org.nonprofit.core.SystemEventType;
  * {@link VolunteerView}, calls the model ({@link VolunteerService} and the
  * classes it manages) and tells the view what to show. The view never
  * talks to the model directly, and the model knows nothing about menus.
+ *
+ * When the main menu opens this screen it also passes where to read the
+ * messages the Communication module sent (e.g. an assignment e-mail), so the
+ * view can show them after each action. This module does not import Communication.
  */
 public class VolunteerController {
     private final VolunteerService service;
     private final VolunteerView view;
+    /** True when opened from the main menu: option 0 goes "Back" instead of ending the program. */
+    private final boolean embedded;
+    /** Gives the delivery lines recorded since the last call (none when nothing sends messages). */
+    private final Supplier<List<String>> deliveries;
 
     public VolunteerController(VolunteerService service, VolunteerView view) {
+        this(service, view, false);
+    }
+
+    /** @param embedded true when another menu opens this screen, so 0 means "Back" */
+    public VolunteerController(VolunteerService service, VolunteerView view, boolean embedded) {
+        this(service, view, embedded, List::of);
+    }
+
+    /**
+     * @param embedded   true when another menu opens this screen, so 0 means "Back"
+     * @param deliveries where to take the messages sent since the last action
+     *                   (e.g. {@code CommunicationService::takeOutput})
+     */
+    public VolunteerController(VolunteerService service, VolunteerView view, boolean embedded,
+            Supplier<List<String>> deliveries) {
         this.service = service;
         this.view = view;
+        this.embedded = embedded;
+        this.deliveries = deliveries;
         // The view shows a notification whenever the model assigns a task.
         EventBus.getInstance().subscribe(SystemEventType.VOLUNTEER_ASSIGNED, view);
     }
 
-    /** Shows the menu again after every action until the user chooses Exit. */
+    /** Shows the menu again after every action until the user chooses Exit (or Back). */
     public void run() {
         boolean running = true;
         while (running) {
-            int choice = view.showMenu(service.getStrategy().name());
+            int choice = view.showMenu(service.getStrategy().name(), embedded ? "Back" : "Exit");
             try {
                 switch (choice) {
                     case 1: view.showVolunteers(service.listVolunteers()); break;
@@ -40,16 +66,17 @@ public class VolunteerController {
                     case 4: removeVolunteer(); break;
                     case 5: addTask(); break;
                     case 6: view.showTasks(service.listTasks()); break;
-                    case 7: removeTask(); break;
-                    case 8: changeRule(); break;
-                    case 9: suggest(); break;
-                    case 10: assign(); break;
-                    case 11: assignAll(); break;
-                    case 12: unassign(); break;
-                    case 13: logHours(); break;
-                    case 14: view.showText(service.leaderboardReport(5)); break;
-                    case 15: hoursCertificate(); break;
-                    case 16: participationCertificate(); break;
+                    case 7: updateTask(); break;
+                    case 8: removeTask(); break;
+                    case 9: changeRule(); break;
+                    case 10: suggest(); break;
+                    case 11: assign(); break;
+                    case 12: assignAll(); break;
+                    case 13: unassign(); break;
+                    case 14: logHours(); break;
+                    case 15: view.showText(service.leaderboardReport(5)); break;
+                    case 16: hoursCertificate(); break;
+                    case 17: participationCertificate(); break;
                     case 0: running = false; break;
                     default: view.showError("Please choose a number from the menu.");
                 }
@@ -58,8 +85,11 @@ public class VolunteerController {
                 // are shown to the user instead of stopping the program.
                 view.showError(e.getMessage());
             }
+            view.showDeliveries(deliveries.get());
         }
-        view.showMessage("Goodbye.");
+        if (!embedded) {
+            view.showMessage("Goodbye.");
+        }
     }
 
     // ---- Volunteers ----
@@ -92,15 +122,18 @@ public class VolunteerController {
     }
 
     private void updateProfile() {
-        Volunteer volunteer = requireVolunteer(view.ask("Volunteer id (e.g. VOL-1)"));
+        String id = requireVolunteer(view.ask("Volunteer id (e.g. VOL-1)")).getId();
         int choice = view.showProfileMenu();
+        // The service checks the rules (e.g. a day with an unfinished task cannot be removed).
+        Volunteer volunteer;
         switch (choice) {
-            case 1: volunteer.addSkill(view.ask("Skill to add")); break;
-            case 2: volunteer.removeSkill(view.ask("Skill to remove")); break;
-            case 3: volunteer.addAvailability(parseDay(view.ask("Day to add"))); break;
-            case 4: volunteer.removeAvailability(parseDay(view.ask("Day to remove"))); break;
-            case 5: volunteer.addPreference(view.ask("Category to add")); break;
-            case 6: volunteer.removePreference(view.ask("Category to remove")); break;
+            case 1: volunteer = service.addSkill(id, view.ask("Skill to add")); break;
+            case 2: volunteer = service.removeSkill(id, view.ask("Skill to remove")); break;
+            case 3: volunteer = service.addAvailability(id, parseDay(view.ask("Day to add"))); break;
+            case 4: volunteer = service.removeAvailability(id, parseDay(view.ask("Day to remove"))); break;
+            case 5: volunteer = service.addPreference(id, view.ask("Category to add")); break;
+            case 6: volunteer = service.removePreference(id, view.ask("Category to remove")); break;
+            case 7: volunteer = updateContact(service.findVolunteer(id)); break;
             default:
                 view.showError("Please choose a number from the menu.");
                 return;
@@ -108,8 +141,18 @@ public class VolunteerController {
         view.showMessage("Updated " + volunteer.summary());
     }
 
+    /** Empty answers keep the current value; "-" clears the e-mail or phone. */
+    private Volunteer updateContact(Volunteer current) {
+        String name = keep(view.ask("Name [" + current.getName() + "]"), current.getName());
+        String email = keepOrClear(view.ask("E-mail [" + shown(current.getEmail()) + "] (- to clear)"), current.getEmail());
+        String phone = keepOrClear(view.ask("Phone [" + shown(current.getPhone()) + "] (- to clear)"), current.getPhone());
+        String contactText = view.ask("Contact by (email / sms / social) [" + current.getPreferredContact() + "]");
+        ContactPreference contact = contactText.isEmpty() ? current.getPreferredContact() : parseContact(contactText);
+        return service.updateVolunteerContact(current.getId(), name, email, phone, contact);
+    }
+
     private void removeVolunteer() {
-        String id = view.ask("Volunteer id to remove");
+        String id = normalizeId(view.ask("Volunteer id to remove"));
         if (service.removeVolunteer(id)) {
             view.showMessage("Removed " + id + ". Their unfinished tasks are open again.");
         } else {
@@ -128,6 +171,20 @@ public class VolunteerController {
         Task task = new Task(name, skill, day, category, event.isEmpty() ? null : event);
         service.addTask(task);
         view.showMessage("Added " + task.summary());
+    }
+
+    /** Empty answers keep the current value; "-" clears the event name. */
+    private void updateTask() {
+        Task task = requireTask(view.ask("Task id to update (e.g. TSK-1)"));
+        String name = keep(view.ask("Task name [" + task.getName() + "]"), task.getName());
+        String skill = keep(view.ask("Required skill [" + task.getRequiredSkill() + "]"), task.getRequiredSkill());
+        String dayText = view.ask("Day [" + task.getDay() + "]");
+        DayOfWeek day = dayText.isEmpty() ? task.getDay() : parseDay(dayText);
+        String category = keep(view.ask("Category [" + task.getCategory() + "]"), task.getCategory());
+        String event = keepOrClear(view.ask("Event name [" + shown(task.getEventName()) + "] (- to clear)"),
+                task.getEventName());
+        service.updateTask(task.getId(), name, skill, day, category, event);
+        view.showMessage("Updated " + task.summary());
     }
 
     private void removeTask() {
@@ -199,19 +256,40 @@ public class VolunteerController {
     // ---- Certificates ----
 
     private void hoursCertificate() {
-        String id = view.ask("Volunteer id");
+        String id = normalizeId(view.ask("Volunteer id"));
         view.showText(service.issueHoursCertificate(id, LocalDate.now()));
     }
 
     private void participationCertificate() {
-        String id = view.ask("Volunteer id");
+        String id = normalizeId(view.ask("Volunteer id"));
         String event = view.ask("Event name");
         view.showText(service.issueParticipationCertificate(id, event, LocalDate.now()));
     }
 
     // ---- Turning what the user typed into values ----
 
+    /** IDs are accepted in any case: "vol-1" finds VOL-1. */
+    private static String normalizeId(String id) {
+        return id.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String keep(String answer, String current) {
+        return answer.isEmpty() ? current : answer;
+    }
+
+    private static String keepOrClear(String answer, String current) {
+        if (answer.equals("-")) {
+            return null;
+        }
+        return answer.isEmpty() ? current : answer;
+    }
+
+    private static String shown(String value) {
+        return value == null ? "none" : value;
+    }
+
     private Volunteer requireVolunteer(String id) {
+        id = normalizeId(id);
         Volunteer volunteer = service.findVolunteer(id);
         if (volunteer == null) {
             throw new IllegalArgumentException("No volunteer with id " + id);
@@ -220,6 +298,7 @@ public class VolunteerController {
     }
 
     private Task requireTask(String id) {
+        id = normalizeId(id);
         Task task = service.findTask(id);
         if (task == null) {
             throw new IllegalArgumentException("No task with id " + id);
@@ -256,7 +335,12 @@ public class VolunteerController {
 
     private static double parseHours(String text) {
         try {
-            return Double.parseDouble(text);
+            double hours = Double.parseDouble(text);
+            // parseDouble accepts "NaN" and "Infinity", which are not real hours.
+            if (!Double.isFinite(hours)) {
+                throw new IllegalArgumentException("Hours must be a number, e.g. 2.5");
+            }
+            return hours;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Hours must be a number, e.g. 2.5");
         }

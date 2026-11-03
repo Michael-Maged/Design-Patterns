@@ -1,0 +1,317 @@
+@startuml beneficiary
+' Beneficiaries module (Student 4): class diagram organised by design pattern.
+' Written by hand from the source in org.nonprofit.beneficiary (the UML generator was not available).
+' Only the important members are shown; plain getters, private helpers and id counters are left out.
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 60
+hide circle
+hide empty members
+top to bottom direction
+
+package "org.nonprofit.core (shared)" as core #F5F5F5 {
+  abstract class Person {
+    -id: String
+    -name: String
+    -email: String
+    -phone: String
+    -preferredContact: ContactPreference
+  }
+  interface Audience {
+    +getAudience(): List<? extends Person>
+  }
+  class EventBus <<Singleton>> {
+    +{static} getInstance(): EventBus
+    +publish(event: SystemEvent): void
+  }
+  class SystemEvent {
+    -type: SystemEventType
+    -message: String
+    -recipient: Person
+    -source: Object
+  }
+  enum SystemEventType {
+    RESOURCE_DISTRIBUTED
+    URGENT_NEED
+    ...
+  }
+}
+
+package "Model: beneficiaries, needs, distributions" as model #EEF7EE {
+  class Beneficiary {
+    -area: String
+    -householdSize: int
+    -needs: List<Need>
+    -distributions: List<Distribution>
+    --
+    +Beneficiary(name: String, email: String, phone: String, preferredContact: ContactPreference, area: String, householdSize: int)
+    +Beneficiary(name: String, phone: String, area: String, householdSize: int)
+    +openNeeds(): List<Need>
+    +unitsReceived(): int
+    +summary(): String
+    .. bookkeeping (package-private) ..
+    ~updateDetails(name: String, email: String, phone: String, preferredContact: ContactPreference, area: String, householdSize: int): void
+    ~addNeed(need: Need): void
+    ~removeNeed(need: Need): void
+    ~addDistribution(distribution: Distribution): void
+  }
+
+  class Need {
+    -id: String
+    -beneficiary: Beneficiary
+    -category: String
+    -quantity: int
+    -urgency: Urgency
+    -requestedOn: LocalDate
+    -received: int
+    --
+    ~Need(beneficiary: Beneficiary, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate)
+    ~update(quantity: int, urgency: Urgency): void
+    ~receive(units: int): void
+    +remaining(): int
+    +isMet(): boolean
+    +percentMet(): double
+    +summary(): String
+  }
+
+  enum Urgency {
+    LOW
+    MEDIUM
+    HIGH
+    --
+    +{static} fromString(input: String): Urgency
+  }
+
+  class Distribution {
+    -id: String
+    -need: Need
+    -quantity: int
+    -program: String
+    -date: LocalDate
+    --
+    ~Distribution(need: Need, quantity: int, program: String, date: LocalDate)
+    +getBeneficiary(): Beneficiary
+    +summary(): String
+  }
+}
+
+package "STRATEGY: sharing limited stock between needs" as strategy #EAF2FB {
+  interface AllocationStrategy <<Strategy>> {
+    +allocate(needs: List<Need>, available: int): Map<Need, Integer>
+    +name(): String
+    +{static} fillInOrder(ordered: List<Need>, available: int): Map<Need, Integer>
+  }
+
+  class UrgencyFirstAllocation <<ConcreteStrategy>> {
+    +allocate(needs: List<Need>, available: int): Map<Need, Integer>
+    +name(): String
+  }
+
+  class FirstComeFirstServedAllocation <<ConcreteStrategy>> {
+    +allocate(needs: List<Need>, available: int): Map<Need, Integer>
+    +name(): String
+  }
+
+  class EqualShareAllocation <<ConcreteStrategy>> {
+    +allocate(needs: List<Need>, available: int): Map<Need, Integer>
+    +name(): String
+  }
+
+  enum AllocationMode {
+    URGENCY
+    FIRST_COME
+    EQUAL
+    --
+    +create(): AllocationStrategy
+    +{static} fromString(input: String): AllocationMode
+  }
+}
+
+package "TEMPLATE METHOD: impact reports" as template #FDF3E7 {
+  abstract class ImpactReport <<AbstractClass>> {
+    ~{static} ORGANIZATION: String
+    #reportDate: LocalDate
+    --
+    #ImpactReport(reportDate: LocalDate)
+    +generate(): String
+    .. steps ..
+    #{abstract} title(): String
+    #{abstract} scope(): String
+    #{abstract} collectData(): void
+    #{abstract} hasData(): boolean
+    #{abstract} computeMetrics(): Map<String, String>
+    #{abstract} formatRows(): List<String>
+    #{abstract} summary(): String
+    .. hook ..
+    #footer(): String
+  }
+
+  class ProgramImpactReport <<ConcreteClass>> {
+    -program: String
+    -allDistributions: List<Distribution>
+    -distributions: List<Distribution>
+    -reached: Set<Beneficiary>
+    -needsServed: Set<Need>
+    --
+    +ProgramImpactReport(program: String, allDistributions: List<Distribution>, reportDate: LocalDate)
+    #title(): String
+    #scope(): String
+    #collectData(): void
+    #hasData(): boolean
+    #computeMetrics(): Map<String, String>
+    #formatRows(): List<String>
+    #summary(): String
+  }
+
+  class BeneficiaryProgressReport <<ConcreteClass>> {
+    -beneficiary: Beneficiary
+    -needs: List<Need>
+    --
+    +BeneficiaryProgressReport(beneficiary: Beneficiary, reportDate: LocalDate)
+    #title(): String
+    #scope(): String
+    #collectData(): void
+    #hasData(): boolean
+    #computeMetrics(): Map<String, String>
+    #formatRows(): List<String>
+    #summary(): String
+  }
+}
+
+package "MVC: Beneficiaries screen" as mvc #FFF8E1 {
+  class BeneficiaryView <<View>> {
+    -in: Scanner
+    -out: PrintStream
+    --
+    +BeneficiaryView(in: Scanner, out: PrintStream)
+    +showMenu(currentRule: String, zeroLabel: String): int
+    +ask(prompt: String): String
+    +askNumber(prompt: String): int
+    +showList(lines: List<String>, emptyText: String): void
+    +showText(text: String): void
+    +showMessage(message: String): void
+    +showDeliveries(lines: List<String>): void
+    +showError(message: String): void
+  }
+
+  class BeneficiaryController <<Controller>> {
+    -service: BeneficiaryService
+    -view: BeneficiaryView
+    -embedded: boolean
+    -deliveries: Supplier<List<String>>
+    --
+    +BeneficiaryController(service: BeneficiaryService, view: BeneficiaryView, embedded: boolean, deliveries: Supplier<List<String>>)
+    +run(): void
+    -registerBeneficiary(): void
+    -updateBeneficiary(): void
+    -addNeed(): void
+    -updateNeed(): void
+    -changeAllocationRule(): void
+    -previewDistribution(): void
+    -distribute(): void
+    -giveDirectly(): void
+    -impactReport(): void
+    -askId(prompt: String): String
+  }
+}
+
+package "Service: needs, distribution, reports" as service #F3EEF8 {
+  class BeneficiaryService <<Model>> <<Context>> {
+    -beneficiaries: Map<String, Beneficiary>
+    -needs: Map<String, Need>
+    -distributions: List<Distribution>
+    -bus: EventBus
+    -strategy: AllocationStrategy
+    -urgentResponders: Audience
+    --
+    .. beneficiaries and needs ..
+    +registerBeneficiary(beneficiary: Beneficiary): Beneficiary
+    +findBeneficiary(beneficiaryId: String): Beneficiary
+    +removeBeneficiary(beneficiaryId: String): boolean
+    +updateBeneficiary(beneficiaryId: String, name: String, email: String, phone: String, preferredContact: ContactPreference, area: String, householdSize: int): Beneficiary
+    +addNeed(beneficiaryId: String, category: String, quantity: int, urgency: Urgency, requestedOn: LocalDate): Need
+    +updateNeed(needId: String, quantity: int, urgency: Urgency): Need
+    +removeNeed(needId: String): boolean
+    +openNeeds(category: String): List<Need>
+    +setUrgentResponders(responders: Audience): void
+    .. strategy ..
+    +setStrategy(strategy: AllocationStrategy): void
+    +setStrategy(mode: AllocationMode): void
+    .. distribution ..
+    +preview(category: String, available: int): Map<Need, Integer>
+    +distribute(program: String, category: String, available: int, date: LocalDate): List<Distribution>
+    +giveDirectly(needId: String, units: int, program: String, date: LocalDate): Distribution
+    .. reports ..
+    +programImpactReport(program: String, date: LocalDate): String
+    +progressReport(beneficiaryId: String, date: LocalDate): String
+  }
+}
+
+' ---- Model ----
+Beneficiary -up-|> Person
+Beneficiary "1" *-- "*" Need : needs
+Need "*" --> "1" Beneficiary : beneficiary
+Need --> "1" Urgency
+Beneficiary "1" o-- "*" Distribution : distributions
+Distribution "*" --> "1" Need : need
+
+' ---- Strategy ----
+UrgencyFirstAllocation .up.|> AllocationStrategy
+FirstComeFirstServedAllocation .up.|> AllocationStrategy
+EqualShareAllocation .up.|> AllocationStrategy
+AllocationMode ..> AllocationStrategy : <<creates>>
+AllocationStrategy ..> Need : allocates units to
+note bottom of AllocationStrategy
+  BeneficiaryService (the Context) holds one strategy
+  and can swap it at runtime (setStrategy), so the same
+  stock may go to different people:
+  urgency first | first come, first served | equal share.
+  UrgencyFirst and FirstCome only change the order and
+  reuse fillInOrder(); EqualShare hands out one unit
+  at a time in turn.
+end note
+
+' ---- Template Method ----
+ProgramImpactReport -up-|> ImpactReport
+BeneficiaryProgressReport -up-|> ImpactReport
+ProgramImpactReport --> "*" Distribution : allDistributions
+BeneficiaryProgressReport --> "1" Beneficiary : beneficiary
+note bottom of ImpactReport
+  generate() is final:
+  collectData -> hasData? -> computeMetrics
+  -> title / scope -> formatRows -> metrics
+  -> summary -> footer (hook)
+end note
+
+' ---- MVC ----
+BeneficiaryController --> "1" BeneficiaryView : view
+BeneficiaryController --> "1" BeneficiaryService : model
+BeneficiaryController ..> AllocationMode
+note right of BeneficiaryController
+  MVC: BeneficiaryView (View), BeneficiaryController
+  (Controller), BeneficiaryService (Model). Opened from
+  the main menu (embedded: 0 = Back); after each action
+  the view shows the deliveries passed in, so this
+  module never imports Communication.
+end note
+
+' ---- Service ----
+BeneficiaryService "1" o-- "1" AllocationStrategy : strategy
+BeneficiaryService "1" o-- "*" Beneficiary
+BeneficiaryService "1" o-- "*" Need
+BeneficiaryService "1" o-- "*" Distribution
+BeneficiaryService ..> AllocationMode
+BeneficiaryService --> "0..1" Audience : urgentResponders
+BeneficiaryService ..> ImpactReport : <<issues>>
+BeneficiaryService ..> EventBus : publishes URGENT_NEED,\nRESOURCE_DISTRIBUTED
+BeneficiaryService ..> SystemEvent : <<creates>>
+SystemEvent --> SystemEventType
+note right of BeneficiaryService
+  A HIGH-urgency need is published as URGENT_NEED
+  with the Audience (volunteers, set by DataStore)
+  as its source, so this module never imports the
+  Volunteers package. Every distribution publishes
+  RESOURCE_DISTRIBUTED to the beneficiary.
+end note
+@enduml

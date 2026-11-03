@@ -25,7 +25,7 @@ public class Volunteer extends Person {
     private final List<HourEntry> hourLog = new ArrayList<>();
 
     public Volunteer(String name, String email, String phone, ContactPreference preferredContact) {
-        super("VOL-" + nextId++, name, email, phone, preferredContact);
+        super(takeId(name), name, email, phone, preferredContact);
     }
 
     /** Volunteers are reached by SMS unless they ask otherwise. */
@@ -33,44 +33,64 @@ public class Volunteer extends Person {
         this(name, email, phone, ContactPreference.SMS);
     }
 
+    /** Checks the name before taking a number, so a rejected volunteer does not use one up. */
+    private static String takeId(String name) {
+        requireName(name);
+        return "VOL-" + nextId++;
+    }
+
     // ---- Profile (each returns this so a profile can be built in one line) ----
 
     public Volunteer addSkill(String skill) {
-        skills.add(normalize(skill));
+        skills.add(normalizeSkill(skill));
         return this;
     }
 
-    public Volunteer removeSkill(String skill) {
-        skills.remove(normalize(skill));
+    /**
+     * Package-private: other packages go through {@link VolunteerService#removeSkill},
+     * which refuses a removal that clashes with an open task.
+     */
+    Volunteer removeSkill(String skill) {
+        skills.remove(normalizeSkill(skill));
         return this;
     }
 
     public Volunteer addAvailability(DayOfWeek... days) {
+        // Checked first, so a null day neither gets stored nor leaves the profile half changed.
+        for (DayOfWeek day : days) {
+            if (day == null) {
+                throw new IllegalArgumentException("Day is required");
+            }
+        }
         for (DayOfWeek day : days) {
             availability.add(day);
         }
         return this;
     }
 
-    public Volunteer removeAvailability(DayOfWeek day) {
+    /**
+     * Package-private: other packages go through {@link VolunteerService#removeAvailability},
+     * which refuses a removal that clashes with an open task.
+     */
+    Volunteer removeAvailability(DayOfWeek day) {
         availability.remove(day);
         return this;
     }
 
     public Volunteer addPreference(String category) {
-        preferredCategories.add(normalize(category));
+        preferredCategories.add(normalizeCategory(category));
         return this;
     }
 
     public Volunteer removePreference(String category) {
-        preferredCategories.remove(normalize(category));
+        preferredCategories.remove(normalizeCategory(category));
         return this;
     }
 
     // ---- Queries used by the assignment strategies ----
 
     public boolean hasSkill(String skill) {
-        return skills.contains(normalize(skill));
+        return skills.contains(normalizeSkill(skill));
     }
 
     public boolean isAvailableOn(DayOfWeek day) {
@@ -78,7 +98,7 @@ public class Volunteer extends Person {
     }
 
     public boolean prefers(String category) {
-        return preferredCategories.contains(normalize(category));
+        return preferredCategories.contains(normalizeCategory(category));
     }
 
     /**
@@ -140,9 +160,18 @@ public class Volunteer extends Person {
                 getId(), getName(), skills, availability, preferredCategories, getTotalHours(), openTaskCount());
     }
 
-    static String normalize(String text) {
+    static String normalizeSkill(String skill) {
+        return normalize(skill, "Skill");
+    }
+
+    static String normalizeCategory(String category) {
+        return normalize(category, "Category");
+    }
+
+    /** @param field what the text is, for the error message ("Skill", "Category") */
+    private static String normalize(String text, String field) {
         if (text == null || text.isBlank()) {
-            throw new IllegalArgumentException("Value is required");
+            throw new IllegalArgumentException(field + " is required");
         }
         // Locale.ROOT so matching does not change with the computer's language (e.g. Turkish "I").
         return text.trim().toLowerCase(Locale.ROOT);
