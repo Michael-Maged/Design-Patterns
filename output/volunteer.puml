@@ -16,8 +16,6 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
     -email: String
     -phone: String
     -preferredContact: ContactPreference
-    --
-    +updateContact(name: String, email: String, phone: String, preferredContact: ContactPreference): void
   }
   interface SystemObserver <<Observer>> {
     +onEvent(event: SystemEvent): void
@@ -34,7 +32,6 @@ package "MVC: Volunteers screen" as mvc #FFF8E1 {
     -out: PrintStream
     --
     +showMenu(currentRule: String): int
-    +showMenu(currentRule: String, zeroLabel: String): int
     +showProfileMenu(): int
     +showRuleMenu(): int
     +ask(prompt: String): String
@@ -43,7 +40,6 @@ package "MVC: Volunteers screen" as mvc #FFF8E1 {
     +showTasks(tasks: List<Task>): void
     +showText(text: String): void
     +showMessage(message: String): void
-    +showDeliveries(lines: List<String>): void
     +showError(message: String): void
     +onEvent(event: SystemEvent): void
   }
@@ -51,27 +47,19 @@ package "MVC: Volunteers screen" as mvc #FFF8E1 {
   class VolunteerController <<Controller>> {
     -service: VolunteerService
     -view: VolunteerView
-    -embedded: boolean
-    -deliveries: Supplier<List<String>>
     --
     +VolunteerController(service: VolunteerService, view: VolunteerView)
-    +VolunteerController(service: VolunteerService, view: VolunteerView, embedded: boolean)
-    +VolunteerController(service: VolunteerService, view: VolunteerView, embedded: boolean, deliveries: Supplier<List<String>>)
     +run(): void
     -registerVolunteer(): void
     -updateProfile(): void
-    -removeVolunteer(): void
     -addTask(): void
-    -updateTask(): void
     -removeTask(): void
     -changeRule(): void
     -suggest(): void
     -assign(): void
     -unassign(): void
     -logHours(): void
-    -assignAll(): void
     -hoursCertificate(): void
-    -participationCertificate(): void
   }
 
   class VolunteerApp {
@@ -92,9 +80,9 @@ package "Model: volunteers, tasks, hours" as model #EEF7EE {
     +Volunteer(name: String, email: String, phone: String)
     .. profile ..
     +addSkill(skill: String): Volunteer
-    ~removeSkill(skill: String): Volunteer
+    +removeSkill(skill: String): Volunteer
     +addAvailability(days: DayOfWeek...): Volunteer
-    ~removeAvailability(day: DayOfWeek): Volunteer
+    +removeAvailability(day: DayOfWeek): Volunteer
     +addPreference(category: String): Volunteer
     +removePreference(category: String): Volunteer
     .. queries ..
@@ -127,8 +115,6 @@ package "Model: volunteers, tasks, hours" as model #EEF7EE {
     +isAssigned(): boolean
     +isCompleted(): boolean
     +summary(): String
-    ~{static} check(name: String, requiredSkill: String, day: DayOfWeek, category: String): void
-    ~update(name: String, requiredSkill: String, day: DayOfWeek, category: String, eventName: String): void
     ~setAssignedVolunteer(volunteer: Volunteer): void
     ~markCompleted(): void
   }
@@ -222,22 +208,13 @@ package "Service: assignment, hours, leaderboard" as service #F3EEF8 {
     +findVolunteer(volunteerId: String): Volunteer
     +listVolunteers(): List<Volunteer>
     +removeVolunteer(volunteerId: String): boolean
-    +updateVolunteerContact(volunteerId: String, name: String, email: String, phone: String, preferredContact: ContactPreference): Volunteer
-    +addSkill(volunteerId: String, skill: String): Volunteer
-    +removeSkill(volunteerId: String, skill: String): Volunteer
-    +addAvailability(volunteerId: String, day: DayOfWeek): Volunteer
-    +removeAvailability(volunteerId: String, day: DayOfWeek): Volunteer
-    +addPreference(volunteerId: String, category: String): Volunteer
-    +removePreference(volunteerId: String, category: String): Volunteer
     +addTask(task: Task): Task
     +findTask(taskId: String): Task
     +listTasks(): List<Task>
     +removeTask(taskId: String): void
-    +updateTask(taskId: String, name: String, requiredSkill: String, day: DayOfWeek, category: String, eventName: String): Task
     +openTasks(): List<Task>
     +setStrategy(strategy: AssignmentStrategy): void
     +setStrategy(mode: AssignmentMode): void
-    +getStrategy(): AssignmentStrategy
     +suggest(taskId: String): Volunteer
     +assign(taskId: String): Volunteer
     +assignAllOpen(): int

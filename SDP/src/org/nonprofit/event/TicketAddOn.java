@@ -1,6 +1,5 @@
 package org.nonprofit.event;
 
-import java.util.Locale;
 import java.util.function.UnaryOperator;
 
 /** The add-ons a user can pick; each knows which decorator to wrap a ticket in. */
@@ -21,7 +20,7 @@ public enum TicketAddOn {
 
     public static TicketAddOn fromString(String input) {
         try {
-            return valueOf(input.trim().toUpperCase(Locale.ROOT));
+            return valueOf(input.trim().toUpperCase());
         } catch (IllegalArgumentException | NullPointerException e) {
             throw new IllegalArgumentException("Unknown ticket add-on: " + input);
         }

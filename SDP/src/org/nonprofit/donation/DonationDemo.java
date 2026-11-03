@@ -11,13 +11,10 @@ import org.nonprofit.core.ContactPreference;
  */
 public class DonationDemo {
 
-    // Model classes never print, so the demo prints what Communication sent.
-    private static CommunicationService comms;
-
     public static void main(String[] args) {
         // The Communication module listens on the EventBus. We create it here
         // only so we can SEE the thank-you messages it sends (Observer pattern).
-        comms = new CommunicationService(DonationDocument.ORGANIZATION);
+        new CommunicationService(DonationDocument.ORGANIZATION);
 
         DonationService service = new DonationService();
         LocalDate today = LocalDate.of(2026, 11, 1);
@@ -37,19 +34,16 @@ public class DonationDemo {
         onlineForm.setReference("PAY-88213");
         onlineForm.setMonthly(true);
         Donation online = service.donate(hany.getId(), DonationType.ONLINE, today.minusMonths(9), onlineForm);
-        showMessages();
 
         DonationForm checkForm = new DonationForm(2_000);
         checkForm.setReference("004517");
         checkForm.setBank("National Bank of Egypt");
         checkForm.setCampaign("Winter Blankets");
         service.donate(rania.getId(), "check", today.minusMonths(2), checkForm);
-        showMessages();
 
         DonationForm goodsForm = new DonationForm(1_200);
         goodsForm.setItem("300 loaves of bread for the food drive");
         Donation goods = service.donate(bakery.getId(), "in-kind", today.minusDays(5), goodsForm);
-        showMessages();
 
         System.out.println();
         for (Donation d : service.getDonations()) {
@@ -70,7 +64,6 @@ public class DonationDemo {
         bigGift.setReference("PAY-90410");
         bigGift.setCampaign("winter blankets"); // case doesn't matter
         service.donate(hany.getId(), DonationType.ONLINE, today.minusDays(1), bigGift);
-        showMessages();
         for (Campaign c : service.getCampaigns()) {
             System.out.println("  " + c);
         }
@@ -105,13 +98,6 @@ public class DonationDemo {
             System.out.println("  Accepted (this should not happen!)");
         } catch (IllegalArgumentException e) {
             System.out.println("  Rejected: " + e.getMessage());
-        }
-    }
-
-    /** Prints the messages Communication sent since the last call. */
-    private static void showMessages() {
-        for (String line : comms.takeOutput()) {
-            System.out.println(line);
         }
     }
 

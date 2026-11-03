@@ -81,20 +81,6 @@ public class DonationService {
         return new ArrayList<>(donors.values());
     }
 
-    /**
-     * Changes a donor's name and contact details. The id and the donation history stay the same.
-     * Person.updateContact checks the name before changing anything, so a wrong update changes nothing.
-     * A null contact method keeps the one the donor has now.
-     */
-    public Donor updateDonor(String donorId, String name, String email, String phone, ContactPreference preferredContact) {
-        Donor donor = getDonorOrFail(donorId);
-        if (preferredContact == null) {
-            preferredContact = donor.getPreferredContact();
-        }
-        donor.updateContact(name, email, phone, preferredContact);
-        return donor;
-    }
-
     /** A donor who already gave can't be removed, because their receipts point to them. */
     public void removeDonor(String donorId) {
         Donor donor = getDonorOrFail(donorId);
@@ -168,17 +154,6 @@ public class DonationService {
         EventBus.getInstance().publish(new SystemEvent(SystemEventType.DONATION_RECEIVED, message, donor, donation));
 
         return donation;
-    }
-
-    /**
-     * Same as above, but refuses a date after "today". The screen uses this one, so a
-     * donation can be backdated (e.g. a check that came last month) but not dated in the future.
-     */
-    public Donation donate(String donorId, DonationType type, LocalDate date, DonationForm form, LocalDate today) {
-        if (date != null && date.isAfter(today)) {
-            throw new IllegalArgumentException("A donation can't be dated in the future (" + date + " is after today, " + today + ")");
-        }
-        return donate(donorId, type, date, form);
     }
 
     /** Same as above, but the type comes as text the user typed, e.g. "check" or "in-kind". */

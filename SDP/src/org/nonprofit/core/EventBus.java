@@ -9,11 +9,6 @@ import java.util.Map;
  * SINGLETON + OBSERVER pattern: the one system-wide notification hub.
  * Modules publish {@link SystemEvent}s here; other modules (mainly
  * Communication) subscribe, so publishers never depend on subscribers.
- *
- * Singleton: lazy getInstance() as in the lecture, made thread-safe with
- * double-checked locking + volatile.
- * Observer - Subject, in the lecture's names: subscribe = registerObserver,
- * unsubscribe = removeObserver, publish = notifyObservers.
  */
 public final class EventBus {
     private static volatile EventBus instance;

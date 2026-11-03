@@ -21,8 +21,8 @@ public abstract class Donation {
         if (donor == null) {
             throw new IllegalArgumentException("Donor is required");
         }
-        // Double.isFinite is needed because NaN and Infinity are not caught by "amount <= 0".
-        if (!Double.isFinite(amount) || amount <= 0) {
+        // Double.isNaN is needed because NaN is not caught by "amount <= 0".
+        if (Double.isNaN(amount) || amount <= 0) {
             throw new IllegalArgumentException("Donation amount must be more than zero");
         }
         if (date == null) {

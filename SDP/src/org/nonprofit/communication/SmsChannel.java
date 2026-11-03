@@ -5,7 +5,7 @@ public class SmsChannel implements CommunicationChannel {
     static final int MAX_LENGTH = 160;
 
     @Override
-    public String send(Message message) {
+    public void send(Message message) {
         String number = message.getRecipient().getPhone();
         if (number == null || number.isBlank()) {
             throw new IllegalArgumentException(message.getRecipient().getName() + " has no phone number");
@@ -14,7 +14,7 @@ public class SmsChannel implements CommunicationChannel {
         if (text.length() > MAX_LENGTH) {
             text = text.substring(0, MAX_LENGTH - 3) + "...";
         }
-        return "    [SMS to " + number + "] " + text;
+        System.out.println("    [SMS to " + number + "] " + text);
     }
 
     @Override

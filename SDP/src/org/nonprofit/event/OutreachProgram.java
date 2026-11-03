@@ -17,13 +17,7 @@ public class OutreachProgram extends Event {
         return EventType.OUTREACH;
     }
 
-    public void setTargetCommunity(String targetCommunity) {
-        if (targetCommunity == null || targetCommunity.isBlank()) {
-            throw new IllegalArgumentException("Target community is required");
-        }
-        requireNotCancelled("change its target community");
-        this.targetCommunity = targetCommunity;
-    }
+    public void setTargetCommunity(String targetCommunity) { this.targetCommunity = targetCommunity; }
     public String getTargetCommunity() { return targetCommunity; }
 
     @Override

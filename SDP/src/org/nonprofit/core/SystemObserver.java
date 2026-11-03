@@ -1,9 +1,6 @@
 package org.nonprofit.core;
 
-/**
- * OBSERVER pattern - Observer: anything that wants to hear about system events.
- * {@link #onEvent} is the lecture's update(); the Subject is {@link EventBus}.
- */
+/** OBSERVER pattern (observer role): anything that wants to hear about system events. */
 @FunctionalInterface
 public interface SystemObserver {
     void onEvent(SystemEvent event);

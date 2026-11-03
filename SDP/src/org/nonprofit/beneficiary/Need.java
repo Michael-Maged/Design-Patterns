@@ -15,8 +15,8 @@ public class Need {
     private final String id;
     private final Beneficiary beneficiary;
     private final String category;
-    private int quantity;
-    private Urgency urgency;
+    private final int quantity;
+    private final Urgency urgency;
     private final LocalDate requestedOn;
     private int received;
 
@@ -37,26 +37,6 @@ public class Need {
         this.quantity = quantity;
         this.urgency = urgency;
         this.requestedOn = requestedOn;
-    }
-
-    /**
-     * Changes how much is needed and how urgent it is. The new quantity
-     * cannot be below what has already been received. Checked first, so a
-     * rejected change leaves the need as it was.
-     */
-    void update(int quantity, Urgency urgency) {
-        if (quantity <= 0) {
-            throw new IllegalArgumentException("Quantity must be at least 1");
-        }
-        if (quantity < received) {
-            throw new IllegalArgumentException(id + " has already received " + received + " " + category
-                    + ", so the quantity cannot be less than that");
-        }
-        if (urgency == null) {
-            throw new IllegalArgumentException("Urgency is required");
-        }
-        this.quantity = quantity;
-        this.urgency = urgency;
     }
 
     /** Records units handed over. Giving more than is still needed is refused. */
