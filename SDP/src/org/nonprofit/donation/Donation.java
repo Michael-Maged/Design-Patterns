@@ -7,7 +7,8 @@ import java.time.LocalDate;
  * For an in-kind donation (goods) the amount is the estimated value of the goods.
  *
  * The class is abstract because a donation is always one of the concrete
- * types (online, check or in-kind). Those objects are built by DonationFactory.
+ * types (online, check or in-kind). Those objects are built by the
+ * DonationCreator subclasses (Factory Method pattern).
  */
 public abstract class Donation {
     private final String id;

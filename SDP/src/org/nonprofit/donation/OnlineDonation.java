@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 /**
  * Money paid online (card or bank transfer). The donor can choose to repeat it every month.
- * The constructor is package-private: only DonationFactory creates donations.
+ * The constructor is package-private: only OnlineDonationCreator creates it.
  */
 public class OnlineDonation extends Donation {
     private final String paymentReference;

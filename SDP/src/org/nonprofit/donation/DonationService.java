@@ -17,8 +17,11 @@ import org.nonprofit.core.SystemEventType;
  * The main class of the Donations module. Other parts of the system
  * (the console screen, and later the Facade) only talk to this class.
  *
- * It keeps the donors, donations and campaigns, uses DonationFactory to
- * build new donations, and makes receipts and tax statements.
+ * It keeps the donors, donations and campaigns, hands each new donation to
+ * the DonationCreator for its type, and makes receipts and tax statements.
+ *
+ * FACTORY METHOD pattern (client side): the service only knows the abstract
+ * DonationCreator and the abstract Donation, never the concrete classes.
  *
  * OBSERVER pattern (subject side): every new donation is published on the
  * shared EventBus as DONATION_RECEIVED. This class has no idea who is
@@ -31,8 +34,31 @@ public class DonationService {
     private final Map<String, Donation> donations = new LinkedHashMap<>();
     private final Map<String, Campaign> campaigns = new LinkedHashMap<>(); // key = name in lower case
 
+    // One creator for each donation type (Factory Method).
+    private final Map<DonationType, DonationCreator> creators = new LinkedHashMap<>();
+
     private int donorCount = 0;
     private int donationCount = 0;
+
+    public DonationService() {
+        addCreator(new OnlineDonationCreator());
+        addCreator(new CheckDonationCreator());
+        addCreator(new InKindDonationCreator());
+    }
+
+    /** Plugs in the creator for a donation type (replaces the old one for that type, if any). */
+    public void addCreator(DonationCreator creator) {
+        creators.put(creator.getType(), creator);
+    }
+
+    /** The creator that handles this type of donation. */
+    public DonationCreator getCreator(DonationType type) {
+        DonationCreator creator = creators.get(type);
+        if (creator == null) {
+            throw new IllegalArgumentException("We don't support " + type + " donations yet");
+        }
+        return creator;
+    }
 
     // ======================= Donors =======================
 
@@ -93,8 +119,9 @@ public class DonationService {
     /**
      * Records a new donation. Steps:
      *  1. check the donor (and the campaign, if one was given) exist
-     *  2. ask the factory to build the right kind of donation
-     *  3. save it, add it to the donor's history and to the campaign
+     *  2. ask the creator for this type to build the donation
+     *     (it also adds it to the donor's history)
+     *  3. save it and add it to the campaign
      *  4. publish DONATION_RECEIVED so whoever is listening can react
      */
     public Donation donate(String donorId, DonationType type, LocalDate date, DonationForm form) {
@@ -108,14 +135,14 @@ public class DonationService {
             }
         }
 
-        // FACTORY: we don't care which subclass comes back, it's just "a Donation".
-        // If the form is wrong the factory throws and the number is not used up,
+        // FACTORY METHOD: we don't care which subclass comes back, it's just "a Donation".
+        // If the form is wrong the creator throws and the number is not used up,
         // so the receipt numbers never have gaps.
-        Donation donation = DonationFactory.create(type, "DON-" + (donationCount + 1), donor, date, form);
+        DonationCreator creator = getCreator(type);
+        Donation donation = creator.receive("DON-" + (donationCount + 1), donor, date, form);
         donationCount++;
 
         donations.put(donation.getId(), donation);
-        donor.addDonation(donation);
         if (campaign != null) {
             donation.setCampaign(campaign);
             campaign.addAmount(donation.getAmount());
