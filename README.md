@@ -8,7 +8,7 @@ The full design is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-desig
 
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
-| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory, Template Method, Observer, MVC | [`output/donation.puml`](output/donation.puml) | **Done** |
+| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory Method, Template Method, Observer, MVC | [`output/donation.puml`](output/donation.puml) | **Done** |
 | 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Factory, Decorator, Observer | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method | `output/beneficiary.puml` | Not started |
@@ -31,7 +31,7 @@ Other features: capacity limits, a **waitlist with automatic promotion** when so
 
 | Pattern | Where | What it does |
 |---|---|---|
-| **Factory** | `DonationFactory`, `DonationType`, `Donation` and its subclasses `OnlineDonation`, `CheckDonation`, `InKindDonation` | `DonationFactory.create(type, ...)` is the only place that decides which donation class to build. The subclass constructors are package-private, so nobody else can call `new`. A new donation method means one new subclass and one new `case`. |
+| **Factory Method** | `DonationCreator` (creator), `OnlineDonationCreator`, `CheckDonationCreator`, `InKindDonationCreator` (concrete creators), `Donation` and its subclasses `OnlineDonation`, `CheckDonation`, `InKindDonation` (products) | `DonationCreator.receive()` is final and is the same for every donation: call the factory method `createDonation()`, then add the donation to the donor's history. Each concrete creator decides which donation class to build. `DonationService` only knows the abstract creator and the abstract `Donation`. A new donation method means one new product class plus one new creator, plugged in with `addCreator()`. |
 | **Template Method** | `DonationDocument`, `DonationReceipt`, `TaxStatement` | `DonationDocument.generate()` is final and always prints header, body, totals, footer. A receipt covers one donation. A tax statement lists a donor's donations for one year, with money and goods totalled separately. The `canBeIssued()` hook stops an empty statement from being printed. |
 | **Observer** | `DonationService` (publisher), `DonationView` and `CommunicationService` (observers) | Every new donation is published on the `EventBus` as `DONATION_RECEIVED`. The Communication module sends the thank-you message and the screen shows a notification. `DonationService` never calls either of them directly. |
 | **MVC** | `DonationView`, `DonationController`, `DonationService` (model), `DonationApp` | An interactive console screen. The view only prints and reads input, and the controller turns menu choices into calls on the service. |

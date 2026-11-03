@@ -26,9 +26,23 @@ package "org.nonprofit.core (shared)" as core #F5F5F5 {
   }
 }
 
-package "FACTORY: building the right donation" as factory #EAF2FB {
-  class DonationFactory <<Factory>> {
-    +{static} create(type: DonationType, id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation
+package "FACTORY METHOD: creating donations" as factory #EAF2FB {
+  abstract class DonationCreator <<Creator>> {
+    +receive(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation {final}
+    #{abstract} createDonation(id: String, donor: Donor, date: LocalDate, form: DonationForm): Donation
+    +{abstract} getType(): DonationType
+  }
+  class OnlineDonationCreator <<ConcreteCreator>> {
+    #createDonation(id, donor, date, form): Donation
+    +getType(): DonationType
+  }
+  class CheckDonationCreator <<ConcreteCreator>> {
+    #createDonation(id, donor, date, form): Donation
+    +getType(): DonationType
+  }
+  class InKindDonationCreator <<ConcreteCreator>> {
+    #createDonation(id, donor, date, form): Donation
+    +getType(): DonationType
   }
 
   class DonationForm {
@@ -60,19 +74,19 @@ package "FACTORY: building the right donation" as factory #EAF2FB {
     +{static} money(amount: double): String
   }
 
-  class OnlineDonation {
+  class OnlineDonation <<ConcreteProduct>> {
     -paymentReference: String
     -monthly: boolean
     --
     +isMonthly(): boolean
   }
 
-  class CheckDonation {
+  class CheckDonation <<ConcreteProduct>> {
     -checkNumber: String
     -bankName: String
   }
 
-  class InKindDonation {
+  class InKindDonation <<ConcreteProduct>> {
     -item: String
   }
 }
@@ -118,9 +132,12 @@ package "MODEL: service, donors and campaigns" as model #F3EEF8 {
     -donors: Map<String, Donor>
     -donations: Map<String, Donation>
     -campaigns: Map<String, Campaign>
+    -creators: Map<DonationType, DonationCreator>
     -donorCount: int
     -donationCount: int
     --
+    +addCreator(creator: DonationCreator): void
+    +getCreator(type: DonationType): DonationCreator
     +addDonor(name, email, phone, contact): Donor
     +removeDonor(donorId: String): void
     +addCampaign(name: String, goal: double): Campaign
@@ -171,15 +188,23 @@ package "MVC: console screen" as mvc #EEF7EE {
   }
 }
 
-' ---- Factory ----
+' ---- Factory Method: two parallel hierarchies ----
+OnlineDonationCreator -up-|> DonationCreator
+CheckDonationCreator -up-|> DonationCreator
+InKindDonationCreator -up-|> DonationCreator
 OnlineDonation -up-|> Donation
 CheckDonation -up-|> Donation
 InKindDonation -up-|> Donation
-DonationFactory ..> DonationForm : reads
-DonationFactory ..> DonationType : switch on
-DonationFactory ..> OnlineDonation : <<creates>>
-DonationFactory ..> CheckDonation : <<creates>>
-DonationFactory ..> InKindDonation : <<creates>>
+DonationCreator ..> Donation : <<creates>>
+DonationCreator ..> DonationForm : reads
+OnlineDonationCreator ..> OnlineDonation : <<creates>>
+CheckDonationCreator ..> CheckDonation : <<creates>>
+InKindDonationCreator ..> InKindDonation : <<creates>>
+note top of DonationCreator
+  receive() is final:
+  createDonation() (factory method)
+  -> add to donor's history
+end note
 
 ' ---- Template Method ----
 DonationReceipt -up-|> DonationDocument
@@ -198,7 +223,7 @@ Donation "*" --> "0..1" Campaign
 DonationService "1" o-- "*" Donor
 DonationService "1" o-- "*" Donation
 DonationService "1" o-- "*" Campaign
-DonationService ..> DonationFactory : uses
+DonationService "1" o-- "3" DonationCreator : creators
 DonationService ..> DonationDocument : <<issues>>
 DonationService ..> EventBus : publishes DONATION_RECEIVED
 
