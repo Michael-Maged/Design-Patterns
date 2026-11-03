@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "GUI (JavaFX)",
+            "request": "launch",
+            "mainClass": "org.nonprofit.gui.GuiApp",
+            "vmArgs": "--module-path lib/javafx-sdk-21/lib --add-modules javafx.controls"
+        },
+        {
+            "type": "java",
+            "name": "Console menu",
+            "request": "launch",
+            "mainClass": "App"
+        },
+        {
+            "type": "java",
+            "name": "Console demo (App --demo)",
+            "request": "launch",
+            "mainClass": "App",
+            "args": "--demo"
+        }
+    ]
+}
