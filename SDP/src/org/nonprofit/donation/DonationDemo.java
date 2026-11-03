@@ -24,7 +24,11 @@ public class DonationDemo {
         Donor bakery = service.addDonor("El Nour Bakery", "orders@elnour.example", "+20120000003", null);
         service.addCampaign("Winter Blankets", 15_000);
 
-        title("1. FACTORY - one method, three kinds of donation");
+        title("1. FACTORY METHOD - each creator decides which donation to build");
+        for (DonationType type : DonationType.values()) {
+            System.out.println("  " + type + " is handled by " + service.getCreator(type).getClass().getSimpleName());
+        }
+        System.out.println();
 
         DonationForm onlineForm = new DonationForm(500);
         onlineForm.setReference("PAY-88213");
