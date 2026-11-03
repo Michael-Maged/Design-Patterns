@@ -2,234 +2,215 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEvent;
 import org.nonprofit.core.SystemEventType;
 
 /**
- * The main class of the Donations module. Other parts of the system
- * (the console screen, and later the Facade) only talk to this class.
+ * Entry point of the Donations module (the Facade in core calls this).
+ * Keeps donors, donations and campaigns, hands each new donation to the
+ * {@link DonationProcessor} for its method, publishes DONATION_RECEIVED on
+ * the EventBus and produces receipts and tax statements.
  *
- * It keeps the donors, donations and campaigns, hands each new donation to
- * the DonationCreator for its type, and makes receipts and tax statements.
- *
- * FACTORY METHOD pattern (client side): the service only knows the abstract
- * DonationCreator and the abstract Donation, never the concrete classes.
- *
- * OBSERVER pattern (subject side): every new donation is published on the
- * shared EventBus as DONATION_RECEIVED. This class has no idea who is
- * listening. The Communication module listens and sends the thank-you
- * message, but we never call it directly.
+ * It depends only on the abstract creator and the abstract {@link Donation},
+ * never on a concrete donation class (Dependency Inversion Principle).
  */
 public class DonationService {
-    // LinkedHashMap keeps things in the order they were added, which looks nicer in lists.
     private final Map<String, Donor> donors = new LinkedHashMap<>();
     private final Map<String, Donation> donations = new LinkedHashMap<>();
-    private final Map<String, Campaign> campaigns = new LinkedHashMap<>(); // key = name in lower case
-
-    // One creator for each donation type (Factory Method).
-    private final Map<DonationType, DonationCreator> creators = new LinkedHashMap<>();
-
-    private int donorCount = 0;
-    private int donationCount = 0;
+    private final Map<String, Campaign> campaigns = new LinkedHashMap<>();
+    private final Map<DonationType, DonationProcessor> processors = new LinkedHashMap<>();
+    private final EventBus bus = EventBus.getInstance();
 
     public DonationService() {
-        addCreator(new OnlineDonationCreator());
-        addCreator(new CheckDonationCreator());
-        addCreator(new InKindDonationCreator());
+        processors.put(DonationType.ONLINE, new OnlineDonationProcessor());
+        processors.put(DonationType.CHECK, new CheckDonationProcessor());
+        processors.put(DonationType.IN_KIND, new InKindDonationProcessor());
     }
 
-    /** Plugs in the creator for a donation type (replaces the old one for that type, if any). */
-    public void addCreator(DonationCreator creator) {
-        creators.put(creator.getType(), creator);
+    /** Plugs in the creator for a donation method (replacing any earlier one for that method). */
+    public void addProcessor(DonationProcessor processor) {
+        processors.put(processor.getType(), processor);
     }
 
-    /** The creator that handles this type of donation. */
-    public DonationCreator getCreator(DonationType type) {
-        DonationCreator creator = creators.get(type);
-        if (creator == null) {
-            throw new IllegalArgumentException("We don't support " + type + " donations yet");
+    public DonationProcessor processorFor(DonationType type) {
+        DonationProcessor processor = processors.get(type);
+        if (processor == null) {
+            throw new IllegalArgumentException("No processor for " + type + " donations");
         }
-        return creator;
+        return processor;
     }
 
-    // ======================= Donors =======================
+    // ---- Donors ----
 
-    public Donor addDonor(String name, String email, String phone, ContactPreference preferredContact) {
-        if (preferredContact == null) {
-            preferredContact = ContactPreference.EMAIL; // we thank donors by e-mail unless they ask otherwise
-        }
-        Donor donor = new Donor("DNR-" + (donorCount + 1), name, email, phone, preferredContact);
-        donorCount++; // only counted after the donor was created successfully
+    public Donor registerDonor(Donor donor) {
         donors.put(donor.getId(), donor);
         return donor;
     }
 
-    /** @return the donor, or null if the id doesn't exist */
+    /** @return the donor, or null if there is none with that id */
     public Donor findDonor(String donorId) {
         return donors.get(donorId);
     }
 
-    public List<Donor> getDonors() {
+    public List<Donor> listDonors() {
         return new ArrayList<>(donors.values());
     }
 
-    /** A donor who already gave can't be removed, because their receipts point to them. */
-    public void removeDonor(String donorId) {
-        Donor donor = getDonorOrFail(donorId);
+    /** Donors with donations on record cannot be removed: receipts and tax statements depend on them. */
+    public boolean removeDonor(String donorId) {
+        Donor donor = requireDonor(donorId);
         if (!donor.getDonations().isEmpty()) {
-            throw new IllegalStateException(donor.getName() + " has donations on record and can't be removed");
+            throw new IllegalStateException(donor.getName() + " has donations on record and cannot be removed");
         }
-        donors.remove(donorId);
+        return donors.remove(donorId) != null;
     }
 
-    // ======================= Campaigns =======================
+    // ---- Campaigns ----
 
-    public Campaign addCampaign(String name, double goal) {
-        Campaign campaign = new Campaign(name, goal);
-        String key = campaign.getName().toLowerCase(Locale.ROOT);
+    public Campaign createCampaign(String name, double goal) {
+        String key = key(name);
         if (campaigns.containsKey(key)) {
-            throw new IllegalArgumentException("There is already a campaign called " + campaign.getName());
+            throw new IllegalArgumentException("Campaign already exists: " + name);
         }
+        Campaign campaign = new Campaign(name, goal);
         campaigns.put(key, campaign);
         return campaign;
     }
 
-    /** Case doesn't matter: "winter blankets" finds "Winter Blankets". Returns null if not found. */
+    /** @return the campaign (names compared without regard to case), or null if there is none */
     public Campaign findCampaign(String name) {
         if (name == null) {
             return null;
         }
-        return campaigns.get(name.trim().toLowerCase(Locale.ROOT));
+        return campaigns.get(key(name));
     }
 
-    public List<Campaign> getCampaigns() {
+    public List<Campaign> listCampaigns() {
         return new ArrayList<>(campaigns.values());
     }
 
-    // ======================= Donations =======================
+    // ---- Recording donations ----
 
     /**
-     * Records a new donation. Steps:
-     *  1. check the donor (and the campaign, if one was given) exist
-     *  2. ask the creator for this type to build the donation
-     *     (it also adds it to the donor's history)
-     *  3. save it and add it to the campaign
-     *  4. publish DONATION_RECEIVED so whoever is listening can react
+     * Has the creator for this method build and number the donation, then
+     * adds it to its campaign and publishes DONATION_RECEIVED.
      */
-    public Donation donate(String donorId, DonationType type, LocalDate date, DonationForm form) {
-        Donor donor = getDonorOrFail(donorId);
-
+    public Donation recordDonation(String donorId, DonationType type, LocalDate date, DonationDetails details) {
+        Donor donor = requireDonor(donorId);
         Campaign campaign = null;
-        if (form.getCampaign() != null && !form.getCampaign().isBlank()) {
-            campaign = findCampaign(form.getCampaign());
+        if (details.campaign() != null) {
+            campaign = findCampaign(details.campaign());
             if (campaign == null) {
-                throw new IllegalArgumentException("No campaign called " + form.getCampaign());
+                throw new IllegalArgumentException("No campaign named " + details.campaign());
             }
         }
-
-        // FACTORY METHOD: we don't care which subclass comes back, it's just "a Donation".
-        // If the form is wrong the creator throws and the number is not used up,
-        // so the receipt numbers never have gaps.
-        DonationCreator creator = getCreator(type);
-        Donation donation = creator.receive("DON-" + (donationCount + 1), donor, date, form);
-        donationCount++;
-
+        Donation donation = processorFor(type).receive(donor, date, details);
         donations.put(donation.getId(), donation);
         if (campaign != null) {
-            donation.setCampaign(campaign);
-            campaign.addAmount(donation.getAmount());
+            campaign.addDonation(donation);
         }
-
-        // OBSERVER: tell the rest of the system. Communication will thank the donor.
-        String message = "Thank you for your " + type.name().toLowerCase(Locale.ROOT).replace('_', '-')
-                + " donation of " + Donation.money(donation.getAmount()) + "!";
-        EventBus.getInstance().publish(new SystemEvent(SystemEventType.DONATION_RECEIVED, message, donor, donation));
-
+        bus.publish(new SystemEvent(SystemEventType.DONATION_RECEIVED,
+                String.format("Thank you for your %s donation of %s", type, DonationDocument.money(donation.getValue())),
+                donor, donation));
         return donation;
     }
 
-    /** Same as above, but the type comes as text the user typed, e.g. "check" or "in-kind". */
-    public Donation donate(String donorId, String typeText, LocalDate date, DonationForm form) {
-        return donate(donorId, DonationType.fromText(typeText), date, form);
+    /** Records a donation from user input, e.g. {@code recordDonation(id, "check", ...)}. */
+    public Donation recordDonation(String donorId, String typeInput, LocalDate date, DonationDetails details) {
+        return recordDonation(donorId, DonationType.fromString(typeInput), date, details);
     }
 
-    /** @return the donation, or null if the id doesn't exist */
+    /** @return the donation, or null if there is none with that id */
     public Donation findDonation(String donationId) {
         return donations.get(donationId);
     }
 
-    public List<Donation> getDonations() {
+    public List<Donation> listDonations() {
         return new ArrayList<>(donations.values());
     }
 
-    // ======================= Reports =======================
+    // ---- Reports ----
 
-    public double getTotalRaised() {
+    public double totalRaised() {
         double total = 0;
-        for (Donation donation : donations.values()) {
-            total += donation.getAmount();
+        for (Donation d : donations.values()) {
+            total += d.getValue();
         }
         return total;
     }
 
-    public double getTotalFor(DonationType type) {
-        double total = 0;
-        for (Donation donation : donations.values()) {
-            if (donation.getType() == type) {
-                total += donation.getAmount();
+    /** Total value per donation method, in the order ONLINE, CHECK, IN_KIND. */
+    public Map<DonationType, Double> totalsByType() {
+        Map<DonationType, Double> totals = new LinkedHashMap<>();
+        for (DonationType type : DonationType.values()) {
+            totals.put(type, 0.0);
+        }
+        for (Donation d : donations.values()) {
+            totals.put(d.getType(), totals.get(d.getType()) + d.getValue());
+        }
+        return totals;
+    }
+
+    /** Donors ranked by total given, most first (equal totals keep their registration order). */
+    public List<Donor> topDonors(int top) {
+        List<Donor> ranked = new ArrayList<>();
+        for (Donor donor : donors.values()) {
+            // Insert before the first donor who gave less.
+            int position = ranked.size();
+            for (int i = 0; i < ranked.size(); i++) {
+                if (ranked.get(i).getTotalGiven() < donor.getTotalGiven()) {
+                    position = i;
+                    break;
+                }
             }
+            ranked.add(position, donor);
         }
-        return total;
-    }
-
-    /** The donors who gave the most, biggest first. */
-    public List<Donor> getTopDonors(int howMany) {
-        List<Donor> list = new ArrayList<>(donors.values());
-        list.sort(Comparator.comparingDouble(Donor::getTotalGiven).reversed());
-        if (list.size() > howMany) {
-            return new ArrayList<>(list.subList(0, howMany));
-        }
-        return list;
+        return new ArrayList<>(ranked.subList(0, Math.min(top, ranked.size())));
     }
 
     public String summaryReport() {
-        StringBuilder text = new StringBuilder("Donation summary\n");
-        for (DonationType type : DonationType.values()) {
-            text.append(String.format("  %-8s %12s%n", type, Donation.money(getTotalFor(type))));
+        StringBuilder sb = new StringBuilder("Donation summary\n");
+        Map<DonationType, Double> totals = totalsByType();
+        for (DonationType type : totals.keySet()) {
+            sb.append(String.format("  %-8s %12s%n", type, DonationDocument.money(totals.get(type))));
         }
-        text.append(String.format("  %-8s %12s", "TOTAL", Donation.money(getTotalRaised())));
-        return text.toString();
+        sb.append(String.format("  %-8s %12s", "TOTAL", DonationDocument.money(totalRaised())));
+        return sb.toString();
     }
 
-    // ======================= Documents (Template Method) =======================
+    // ---- Documents (Template Method) ----
 
-    public String makeReceipt(String donationId, LocalDate issueDate) {
-        Donation donation = donations.get(donationId);
-        if (donation == null) {
-            throw new IllegalArgumentException("No donation with id " + donationId);
-        }
-        return new DonationReceipt(donation, issueDate).generate();
+    public String receipt(String donationId, LocalDate issueDate) {
+        return new DonationReceipt(requireDonation(donationId), issueDate).generate();
     }
 
-    public String makeTaxStatement(String donorId, int year, LocalDate issueDate) {
-        return new TaxStatement(getDonorOrFail(donorId), year, issueDate).generate();
+    public String taxStatement(String donorId, int year, LocalDate issueDate) {
+        return new TaxDeductionStatement(requireDonor(donorId), year, issueDate).generate();
     }
 
-    // ======================= Helpers =======================
-
-    private Donor getDonorOrFail(String donorId) {
+    private Donor requireDonor(String donorId) {
         Donor donor = donors.get(donorId);
         if (donor == null) {
             throw new IllegalArgumentException("No donor with id " + donorId);
         }
         return donor;
+    }
+
+    private Donation requireDonation(String donationId) {
+        Donation donation = donations.get(donationId);
+        if (donation == null) {
+            throw new IllegalArgumentException("No donation with id " + donationId);
+        }
+        return donation;
+    }
+
+    private static String key(String name) {
+        return name.trim().toLowerCase(Locale.ROOT);
     }
 }

@@ -2,7 +2,7 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-/** TEMPLATE METHOD (concrete class): a receipt for one single donation. */
+/** TEMPLATE METHOD pattern (concrete class): a receipt for a single donation. */
 public class DonationReceipt extends DonationDocument {
     private final Donation donation;
 
@@ -12,41 +12,37 @@ public class DonationReceipt extends DonationDocument {
     }
 
     @Override
-    protected String getTitle() {
+    protected String title() {
         return "Donation Receipt " + donation.getId();
     }
 
     @Override
     protected String body() {
-        String text = "Donor:    " + donation.getDonor().getName() + " (" + donation.getDonor().getId() + ")\n"
-                + "Date:     " + donation.getDate() + "\n"
-                + "Method:   " + donation.getType() + "\n"
-                + "Details:  " + donation.getDetails();
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Donor:     %s (%s)%n", donation.getDonor().getName(), donation.getDonor().getId()));
+        sb.append(String.format("Date:      %s%n", donation.getDate()));
+        sb.append(String.format("Method:    %s%n", donation.getType()));
+        sb.append(String.format("Details:   %s", donation.details()));
         if (donation.getCampaign() != null) {
-            text += "\nCampaign: " + donation.getCampaign().getName();
+            sb.append(String.format("%nCampaign:  %s", donation.getCampaign()));
         }
-        // Client requirement: monthly online gifts get a special thank-you line.
-        if (donation instanceof OnlineDonation && ((OnlineDonation) donation).isMonthly()) {
-            text += "\nThis is a monthly gift. Thank you for giving every month!";
+        if (donation instanceof OnlineDonation && ((OnlineDonation) donation).isRecurringMonthly()) {
+            sb.append(String.format("%nThis is a recurring monthly gift. Thank you for giving every month."));
         }
-        return text;
+        return sb.toString();
     }
 
     @Override
     protected String totals() {
-        if (donation.getType() == DonationType.IN_KIND) {
-            return "Estimated value:  " + Donation.money(donation.getAmount());
-        }
-        return "Amount received:  " + Donation.money(donation.getAmount());
+        String label = donation.getType() == DonationType.IN_KIND ? "Estimated value:" : "Amount received:";
+        return String.format("%-20s %s", label, money(donation.getValue()));
     }
 
-    /** We use the hook to add one extra line for goods. */
+    /** In-kind gifts carry an extra note about how the value was set. */
     @Override
     protected String footer() {
-        String text = super.footer();
-        if (donation.getType() == DonationType.IN_KIND) {
-            text += "\nThe value of donated goods is the donor's own estimate.";
-        }
-        return text;
+        String note = donation.getType() == DonationType.IN_KIND
+                ? "\nThe value of donated goods is the donor's own estimate." : "";
+        return super.footer() + note;
     }
 }
