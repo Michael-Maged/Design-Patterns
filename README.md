@@ -1,6 +1,6 @@
 # Design-Patterns: Non-Profit Management System
 
-A Java console system for a non-profit organization. It covers donations, volunteers, events, beneficiaries and communication, and is built to demonstrate the design patterns from the course: **Simple Factory, Factory Method, Observer, Strategy, Template Method, Decorator, Singleton, MVC**.
+A Java system for a non-profit organization, with a console menu and a JavaFX window over the same model. It covers donations, volunteers, events, beneficiaries and communication, and is built to demonstrate the design patterns from the course: **Simple Factory, Factory Method, Observer, Strategy, Template Method, Decorator, Singleton, MVC**.
 
 The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-system-design.md`](docs/superpowers/specs/2026-10-24-nonprofit-system-design.md). It planned a `NonProfitFacade`; that was dropped, and there is **no Facade** in the code: the main menu opens each module's own MVC screen, and each screen's controller calls its module service (from `DataStore`) directly. This README and the diagrams in `output/` describe the code as it is.
 
@@ -13,7 +13,9 @@ The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-sys
 | 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Simple Factory, Decorator, Observer, MVC | [`output/event.puml`](output/event.puml) | **Done** |
 | 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method, MVC | [`output/beneficiary.puml`](output/beneficiary.puml) | **Done** |
 | 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer, MVC | [`output/communication.puml`](output/communication.puml) | **Done** |
-| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App` | Data store, event bus, console menu, overall diagram, requirements doc | Singleton, Observer, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
+| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App`, `org.nonprofit.gui` (`GuiApp`, `MainWindow`, `gui.common`) | Data store, event bus, console menu, GUI window and shared GUI helpers, overall diagram, requirements doc | Singleton, Observer, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
+
+**GUI screens.** Each module's GUI screen (`org.nonprofit.gui.<module>`: `<Module>Panel` + `<Module>GuiController`) belongs with that module's student; `GuiApp`, `MainWindow` and `gui.common` belong to Student 6. See [GUI (JavaFX)](#gui-javafx).
 
 \* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`. `Person.updateContact(...)` lets every module edit a person's name and contact details (the ID never changes, and a blank name is refused).
 
@@ -122,7 +124,76 @@ java -cp bin org.nonprofit.communication.CommunicationDemo
 java -cp bin org.nonprofit.beneficiary.BeneficiaryDemo
 ```
 
-In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` and `DonationApp` open the interactive Volunteers and Donations screens; the `...Demo` classes run a fixed walkthrough.
+In VS Code, open `SDP/src/App.java` and click **Run** for the main menu, or open `SDP/src/org/nonprofit/event/EventDemo.java`, `SDP/src/org/nonprofit/volunteer/VolunteerDemo.java` or `SDP/src/org/nonprofit/donation/DonationDemo.java` and click **Run**. `VolunteerApp` and `DonationApp` open the interactive Volunteers and Donations screens; the `...Demo` classes run a fixed walkthrough. The JavaFX window needs the JavaFX SDK and its own commands: see [GUI (JavaFX)](#gui-javafx) below. If the SDK is missing, the first `javac` line fails on the `gui` files; build with `-not -path "*/gui/*"` instead.
+
+## GUI (JavaFX)
+
+A JavaFX window with a sidebar (**Donations, Volunteers, Events, Beneficiaries, Communication**), the selected module's screen in the middle and a live **notification feed** at the bottom (the e-mails, SMS and posts Communication sent, and the Events attendees' new notes). It is a second **View + Controller** layer on the **same model** as the console menu: MVC with two views and one model. The module services in `DataStore` were not changed for it, and what you do in the GUI is the same data the console would show. All GUI code is under `org.nonprofit.gui`; each `gui.<module>` package imports only its own module, `core` and `gui.common`, so modules still never import each other.
+
+| Class | Role |
+|---|---|
+| `gui.GuiApp` | Loads the sample data into the `DataStore` and opens the window |
+| `gui.MainWindow` | Builds the five module controllers on their services from `DataStore`, the sidebar and the notification feed |
+| `gui.<module>.<Module>Panel` | **View**: JavaFX controls only (tables, buttons, drop-downs); never calls a service |
+| `gui.<module>.<Module>GuiController` | **Controller**: turns each click into calls on the module service and tells the panel what to show |
+| `gui.common` | Shared helpers: `Dialogs` / `FxDialogs` (error, info, confirm, monospace text for receipts, certificates and reports, forms), `Form` / `FormValues` (a form described without JavaFX), `Feed` / `NotificationFeed`, `ScreenActions` (runs an action, shows a broken rule as an error dialog, refreshes, moves Communication's output to the feed), `Ui` (titles, toolbars, sections, tables), `Inputs` (number parsing), `Theme` (the stylesheet) |
+
+Where each pattern can be seen in the window:
+
+| Screen | Pattern | What you see |
+|---|---|---|
+| Donations | **Factory Method** | A bar lists the creator for each donation type and names the creator that built the last donation (e.g. `OnlineDonationCreator built OnlineDonation DON-5 ...`) |
+| | **Template Method** | Receipt and tax statement open as text documents |
+| Volunteers | **Strategy** | The assignment rule drop-down swaps the strategy live; **Suggest** (and selecting a task) shows who the current rule picks |
+| | **Template Method** | Hours and event participation certificates |
+| Events | **Simple Factory** | **Create...** picks the event type (fundraiser, workshop, outreach program) |
+| | **Decorator** | Registering offers the VIP / Meal / Parking add-ons with their prices; the ticket's description and total price come from the stacked decorators |
+| | **Observer** | After each action the attendees' new notes (reschedule, cancel, reminder) appear in the feed as `[inbox of ...]` |
+| Beneficiaries | **Strategy** | The allocation rule drop-down plus **Preview split...** shows how the same stock would be shared under the current rule |
+| | **Template Method** | Progress report (one beneficiary) and program impact report |
+| | | HIGH-urgency needs are shown with a red badge |
+| Communication | **Strategy** | Channel per person from their preferred contact, or one channel forced for the whole send; the status line counts who each channel reached |
+| | **Decorator** | **Preview** shows the same text as each channel would deliver it (e-mail with signature and footer, social media with signature, SMS plain) |
+| Feed | **Observer** | Messages Communication sent in reaction to `EventBus` events (thank-yous, assignments, registrations, urgent needs) |
+| All | **Singleton** | `DataStore` is the one model shared by the GUI and the console |
+
+### Setup (every teammate, once)
+
+JavaFX is not part of the JDK.
+
+1. Download the **JavaFX 21 SDK** (the *SDK*, not *jmods*) for your OS from <https://gluonhq.com/products/javafx/>: macOS Apple Silicon = aarch64, Intel Mac = x64, Windows x64, Linux x64.
+2. Unzip it and rename/move the folder so the jars are at **`SDP/lib/javafx-sdk-21/lib/`** (e.g. `SDP/lib/javafx-sdk-21/lib/javafx.controls.jar`).
+3. The folder is in `.gitignore` because it is different for each OS: never commit it.
+4. macOS: if Gatekeeper blocks the native libraries when the window opens, run `xattr -dr com.apple.quarantine SDP/lib/javafx-sdk-21`.
+
+### Run
+
+In VS Code: **Run and Debug** → **GUI (JavaFX)** (`SDP/.vscode/launch.json` passes the module path). The same list has **Console menu** and **Console demo (App --demo)**.
+
+From the `SDP` folder, macOS / Linux:
+
+```sh
+javac --release 17 --module-path lib/javafx-sdk-21/lib --add-modules javafx.controls -d bin $(find src -name "*.java")
+java --module-path lib/javafx-sdk-21/lib --add-modules javafx.controls -cp bin org.nonprofit.gui.GuiApp
+```
+
+Windows PowerShell (paths use `\`; a classpath with several entries would use `;`):
+
+```powershell
+javac --release 17 --module-path lib\javafx-sdk-21\lib --add-modules javafx.controls -d bin (Get-ChildItem -Recurse -Filter *.java src | % FullName)
+java --module-path lib\javafx-sdk-21\lib --add-modules javafx.controls -cp bin org.nonprofit.gui.GuiApp
+```
+
+### Without JavaFX
+
+The console app still builds if you skip the GUI package:
+
+```sh
+javac --release 17 -d bin $(find src -name "*.java" -not -path "*/gui/*")
+java -cp bin App
+```
+
+(PowerShell: `javac --release 17 -d bin (Get-ChildItem -Recurse -Filter *.java src | ? FullName -notmatch '\\gui\\' | % FullName)`.) Without the SDK, VS Code shows errors in the `gui/` files; the **Console menu** and **Console demo** run configurations still work.
 
 ## Diagrams
 
