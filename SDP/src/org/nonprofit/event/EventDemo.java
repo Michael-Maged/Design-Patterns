@@ -7,6 +7,18 @@ import java.util.List;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.core.EventBus;
 import org.nonprofit.core.SystemEventType;
+import org.nonprofit.event.observer.Attendee;
+import org.nonprofit.event.decorator.BasicTicket;
+import org.nonprofit.event.model.EventService;
+import org.nonprofit.event.simplefactory.EventType;
+import org.nonprofit.event.simplefactory.Fundraiser;
+import org.nonprofit.event.decorator.MealTicket;
+import org.nonprofit.event.simplefactory.OutreachProgram;
+import org.nonprofit.event.decorator.ParkingTicket;
+import org.nonprofit.event.model.RegistrationResult;
+import org.nonprofit.event.decorator.Ticket;
+import org.nonprofit.event.decorator.TicketAddOn;
+import org.nonprofit.event.simplefactory.Workshop;
 
 /**
  * Stand-alone walkthrough of the Events module, showing each pattern.

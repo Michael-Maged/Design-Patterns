@@ -4,6 +4,13 @@ import java.time.LocalDate;
 
 import org.nonprofit.communication.CommunicationService;
 import org.nonprofit.core.ContactPreference;
+import org.nonprofit.donation.model.Campaign;
+import org.nonprofit.donation.factorymethod.Donation;
+import org.nonprofit.donation.templatemethod.DonationDocument;
+import org.nonprofit.donation.model.DonationForm;
+import org.nonprofit.donation.model.DonationService;
+import org.nonprofit.donation.model.DonationType;
+import org.nonprofit.donation.model.Donor;
 
 /**
  * A fixed walkthrough of the Donations module that shows each pattern.
