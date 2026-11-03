@@ -2,28 +2,34 @@ package org.nonprofit.donation;
 
 import java.util.Locale;
 
-/** The donation methods; each one has its own {@link DonationProcessor} that builds it. */
+/** The three ways someone can donate to the organization. */
 public enum DonationType {
     ONLINE,
     CHECK,
     IN_KIND;
 
-    /** Parses user input such as "online", " Check " or "in-kind". */
-    public static DonationType fromString(String input) {
-        if (input == null) {
+    /**
+     * Turns what the user typed into a donation type.
+     * Accepts things like "online", "Check", "cheque", "in-kind" or "in kind".
+     */
+    public static DonationType fromText(String text) {
+        if (text == null) {
             throw new IllegalArgumentException("Donation type is required");
         }
-        String key = input.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
-        if (key.equals("INKIND")) {
-            return IN_KIND;
-        }
-        if (key.equals("CHEQUE")) {
-            return CHECK;
-        }
-        try {
-            return valueOf(key);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Unknown donation type: " + input);
+        String clean = text.trim().toLowerCase(Locale.ROOT);
+        switch (clean) {
+            case "online":
+                return ONLINE;
+            case "check":
+            case "cheque":
+                return CHECK;
+            case "in-kind":
+            case "in kind":
+            case "inkind":
+            case "goods":
+                return IN_KIND;
+            default:
+                throw new IllegalArgumentException("Unknown donation type: " + text + " (use online, check or in-kind)");
         }
     }
 }
