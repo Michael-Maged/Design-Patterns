@@ -3,9 +3,9 @@ package org.nonprofit.gui.donation;
 import java.util.List;
 import java.util.Locale;
 
-import org.nonprofit.donation.Campaign;
-import org.nonprofit.donation.Donation;
-import org.nonprofit.donation.Donor;
+import org.nonprofit.donation.model.Campaign;
+import org.nonprofit.donation.factorymethod.Donation;
+import org.nonprofit.donation.model.Donor;
 import org.nonprofit.gui.common.Ui;
 
 import javafx.beans.property.ReadOnlyObjectWrapper;

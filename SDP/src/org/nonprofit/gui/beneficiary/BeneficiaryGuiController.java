@@ -7,12 +7,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import org.nonprofit.beneficiary.AllocationMode;
-import org.nonprofit.beneficiary.Beneficiary;
-import org.nonprofit.beneficiary.BeneficiaryService;
-import org.nonprofit.beneficiary.Distribution;
-import org.nonprofit.beneficiary.Need;
-import org.nonprofit.beneficiary.Urgency;
+import org.nonprofit.beneficiary.strategy.AllocationMode;
+import org.nonprofit.beneficiary.model.Beneficiary;
+import org.nonprofit.beneficiary.model.BeneficiaryService;
+import org.nonprofit.beneficiary.model.Distribution;
+import org.nonprofit.beneficiary.model.Need;
+import org.nonprofit.beneficiary.model.Urgency;
 import org.nonprofit.core.ContactPreference;
 import org.nonprofit.gui.common.Dialogs;
 import org.nonprofit.gui.common.Feed;

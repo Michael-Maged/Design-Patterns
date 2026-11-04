@@ -7,12 +7,12 @@ import java.util.Locale;
 import java.util.function.Supplier;
 
 import org.nonprofit.core.ContactPreference;
-import org.nonprofit.donation.Campaign;
-import org.nonprofit.donation.Donation;
-import org.nonprofit.donation.DonationForm;
-import org.nonprofit.donation.DonationService;
-import org.nonprofit.donation.DonationType;
-import org.nonprofit.donation.Donor;
+import org.nonprofit.donation.model.Campaign;
+import org.nonprofit.donation.factorymethod.Donation;
+import org.nonprofit.donation.model.DonationForm;
+import org.nonprofit.donation.model.DonationService;
+import org.nonprofit.donation.model.DonationType;
+import org.nonprofit.donation.model.Donor;
 import org.nonprofit.gui.common.Dialogs;
 import org.nonprofit.gui.common.Feed;
 import org.nonprofit.gui.common.Form;
