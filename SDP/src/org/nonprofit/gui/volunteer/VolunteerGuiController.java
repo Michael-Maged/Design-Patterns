@@ -8,16 +8,16 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.gui.common.Dialogs;
 import org.nonprofit.gui.common.Feed;
 import org.nonprofit.gui.common.Form;
 import org.nonprofit.gui.common.Inputs;
 import org.nonprofit.gui.common.ScreenActions;
-import org.nonprofit.volunteer.AssignmentMode;
-import org.nonprofit.volunteer.Task;
-import org.nonprofit.volunteer.Volunteer;
-import org.nonprofit.volunteer.VolunteerService;
+import org.nonprofit.volunteer.strategy.AssignmentMode;
+import org.nonprofit.volunteer.model.Task;
+import org.nonprofit.volunteer.model.Volunteer;
+import org.nonprofit.volunteer.model.VolunteerService;
 
 /**
  * MVC pattern (controller) of the Volunteers screen in the GUI: turns each

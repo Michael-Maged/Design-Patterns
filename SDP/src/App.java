@@ -1,23 +1,23 @@
 import java.io.PrintStream;
 import java.util.Scanner;
 
-import org.nonprofit.app.DataStore;
-import org.nonprofit.app.MainMenuController;
-import org.nonprofit.app.MainMenuView;
+import org.nonprofit.app.singleton.DataStore;
+import org.nonprofit.app.mvc.MainMenuController;
+import org.nonprofit.app.mvc.MainMenuView;
 import org.nonprofit.app.SampleData;
 import org.nonprofit.app.SystemDemo;
 import org.nonprofit.beneficiary.mvc.BeneficiaryController;
 import org.nonprofit.beneficiary.mvc.BeneficiaryView;
-import org.nonprofit.communication.CommunicationController;
-import org.nonprofit.communication.CommunicationService;
-import org.nonprofit.communication.CommunicationView;
+import org.nonprofit.communication.mvc.CommunicationController;
+import org.nonprofit.communication.model.CommunicationService;
+import org.nonprofit.communication.mvc.CommunicationView;
 import org.nonprofit.donation.mvc.DonationController;
 import org.nonprofit.donation.mvc.DonationView;
 import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.event.mvc.EventController;
 import org.nonprofit.event.mvc.EventView;
-import org.nonprofit.volunteer.VolunteerController;
-import org.nonprofit.volunteer.VolunteerView;
+import org.nonprofit.volunteer.mvc.VolunteerController;
+import org.nonprofit.volunteer.mvc.VolunteerView;
 
 /**
  * Starts the non-profit management system.

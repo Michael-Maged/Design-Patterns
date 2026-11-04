@@ -1,8 +1,8 @@
 package org.nonprofit.event.observer;
 
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemEventType;
 
 /**
  * OBSERVER pattern (concrete observer) that bridges a single event's

@@ -55,7 +55,7 @@ Root package: `org.nonprofit` under `SDP/src/`.
 | 5 | `org.nonprofit.communication` | Email, SMS, social-media channels, message composition, per-recipient channel choice | Strategy, Decorator |
 | 6 | `org.nonprofit.core` + `App` | Shared data store, notification hub, system facade, console menu, overall diagram, requirements doc | Singleton, Observer, Facade |
 
-Each student also generates their package's diagram into `output/` with the UML generator. Student 6 generates `output/overall.puml`.
+Each student also generates their package's diagram into `output/` with the UML generator. Student 6 generates `output/overall/overall.puml`.
 
 ## Pattern designs per module
 

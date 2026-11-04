@@ -3,8 +3,8 @@ package org.nonprofit.beneficiary.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.Person;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.model.Person;
 
 /**
  * A person or household the organization supports. Keeps the needs they

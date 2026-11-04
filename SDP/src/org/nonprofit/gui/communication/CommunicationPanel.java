@@ -3,8 +3,8 @@ package org.nonprofit.gui.communication;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import org.nonprofit.communication.SentMessage;
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.communication.model.SentMessage;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.gui.common.Ui;
 
 import javafx.geometry.Insets;

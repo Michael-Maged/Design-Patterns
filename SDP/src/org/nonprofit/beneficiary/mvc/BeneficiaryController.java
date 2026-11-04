@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.beneficiary.strategy.AllocationMode;
 import org.nonprofit.beneficiary.model.Beneficiary;
 import org.nonprofit.beneficiary.model.BeneficiaryService;
