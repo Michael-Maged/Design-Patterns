@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.nonprofit.core.Audience;
+import org.nonprofit.core.model.Audience;
 import org.nonprofit.event.simplefactory.EventFactory;
 import org.nonprofit.event.model.EventService;
 import org.nonprofit.event.simplefactory.EventType;

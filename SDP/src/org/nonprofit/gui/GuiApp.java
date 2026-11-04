@@ -1,8 +1,8 @@
 package org.nonprofit.gui;
 
-import org.nonprofit.app.DataStore;
+import org.nonprofit.app.singleton.DataStore;
 import org.nonprofit.app.SampleData;
-import org.nonprofit.event.Attendee;
+import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.gui.common.FxDialogs;
 import org.nonprofit.gui.common.Theme;
 

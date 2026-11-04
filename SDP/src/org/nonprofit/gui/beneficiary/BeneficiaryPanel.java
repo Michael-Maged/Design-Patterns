@@ -5,11 +5,11 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.nonprofit.beneficiary.AllocationMode;
-import org.nonprofit.beneficiary.Beneficiary;
-import org.nonprofit.beneficiary.Distribution;
-import org.nonprofit.beneficiary.Need;
-import org.nonprofit.beneficiary.Urgency;
+import org.nonprofit.beneficiary.strategy.AllocationMode;
+import org.nonprofit.beneficiary.model.Beneficiary;
+import org.nonprofit.beneficiary.model.Distribution;
+import org.nonprofit.beneficiary.model.Need;
+import org.nonprofit.beneficiary.model.Urgency;
 import org.nonprofit.gui.common.Ui;
 
 import javafx.geometry.Insets;

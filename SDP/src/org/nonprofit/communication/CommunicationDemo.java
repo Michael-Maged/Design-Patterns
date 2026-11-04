@@ -2,12 +2,13 @@ package org.nonprofit.communication;
 
 import java.util.List;
 
-import org.nonprofit.core.Audience;
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.Person;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.model.Audience;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.model.Person;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemEventType;
+import org.nonprofit.communication.model.CommunicationService;
 
 /**
  * Stand-alone walkthrough of the Communication module, showing each pattern.

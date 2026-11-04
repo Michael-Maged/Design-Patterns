@@ -3,7 +3,12 @@ package org.nonprofit.volunteer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.volunteer.model.Task;
+import org.nonprofit.volunteer.model.Volunteer;
+import org.nonprofit.volunteer.mvc.VolunteerController;
+import org.nonprofit.volunteer.model.VolunteerService;
+import org.nonprofit.volunteer.mvc.VolunteerView;
 
 /**
  * Starts the Volunteers screen: builds the model, the view and the

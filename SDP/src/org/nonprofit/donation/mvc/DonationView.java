@@ -3,8 +3,8 @@ package org.nonprofit.donation.mvc;
 import java.util.List;
 import java.util.Scanner;
 
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemObserver;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemObserver;
 
 /**
  * MVC pattern (VIEW): only prints things and reads what the user types.

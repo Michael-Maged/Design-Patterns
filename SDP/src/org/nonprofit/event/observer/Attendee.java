@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.Person;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.model.Person;
 
 /**
  * A person who registers for events.

@@ -8,7 +8,7 @@ import java.time.temporal.ChronoUnit;
 import org.nonprofit.beneficiary.model.Beneficiary;
 import org.nonprofit.beneficiary.model.BeneficiaryService;
 import org.nonprofit.beneficiary.model.Urgency;
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.donation.model.DonationForm;
 import org.nonprofit.donation.model.DonationService;
 import org.nonprofit.donation.model.Donor;
@@ -16,9 +16,10 @@ import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.event.observer.Event;
 import org.nonprofit.event.model.EventService;
 import org.nonprofit.event.decorator.TicketAddOn;
-import org.nonprofit.volunteer.Task;
-import org.nonprofit.volunteer.Volunteer;
-import org.nonprofit.volunteer.VolunteerService;
+import org.nonprofit.volunteer.model.Task;
+import org.nonprofit.volunteer.model.Volunteer;
+import org.nonprofit.volunteer.model.VolunteerService;
+import org.nonprofit.app.singleton.DataStore;
 
 /**
  * Fills the system with a few records per module, through the services in

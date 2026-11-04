@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.Person;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.model.Person;
 import org.nonprofit.donation.factorymethod.Donation;
+import org.nonprofit.donation.factorymethod.DonationCreator;
 
 /**
  * A person or a company that gives to the organization.
