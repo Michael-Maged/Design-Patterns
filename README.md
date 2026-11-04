@@ -8,26 +8,30 @@ The original design plan is in [`docs/superpowers/specs/2026-10-24-nonprofit-sys
 
 | Student | Name | Package | Responsibility | Patterns | Diagram | Status |
 |---|---|---|---|---|---|---|
-| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory Method, Template Method, Observer, MVC | [`output/donation.puml`](output/donation.puml) | **Done** |
-| 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method, MVC | [`output/volunteer.puml`](output/volunteer.puml) | **Done** |
-| 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Simple Factory, Decorator, Observer, MVC | [`output/event.puml`](output/event.puml) | **Done** |
-| 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method, MVC | [`output/beneficiary.puml`](output/beneficiary.puml) | **Done** |
-| 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer, MVC | [`output/communication.puml`](output/communication.puml) | **Done** |
-| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App`, `org.nonprofit.gui` (`GuiApp`, `MainWindow`, `gui.common`) | Data store, event bus, console menu, GUI window and shared GUI helpers, overall diagram, requirements doc | Singleton, Observer, MVC | [`output/core.puml`](output/core.puml), [`output/overall.puml`](output/overall.puml) | **Done** |
+| 1 | _TBD_ | `org.nonprofit.donation` | Donors, online/check/in-kind donations, campaigns, receipts and tax documents | Factory Method, Template Method, Observer, MVC | [`output/donation/donation.puml`](output/donation/donation.puml) | **Done** |
+| 2 | _TBD_ | `org.nonprofit.volunteer` | Volunteers, skills, availability, assignment, hours, certificates | Strategy, Template Method, MVC | [`output/volunteer/volunteer.puml`](output/volunteer/volunteer.puml) | **Done** |
+| 3 | _TBD_ | `org.nonprofit.event` | Events, registration, ticketing, waitlist, attendance, reminders | Simple Factory, Decorator, Observer, MVC | [`output/event/event.puml`](output/event/event.puml) | **Done** |
+| 4 | _TBD_ | `org.nonprofit.beneficiary` | Beneficiaries, needs, resource distribution, impact reports | Strategy, Template Method, MVC | [`output/beneficiary/beneficiary.puml`](output/beneficiary/beneficiary.puml) | **Done** |
+| 5 | _TBD_ | `org.nonprofit.communication` | Email / SMS / social media channels, message composition | Strategy, Decorator, Observer, MVC | [`output/communication/communication.puml`](output/communication/communication.puml) | **Done** |
+| 6 | _TBD_ | `org.nonprofit.core`, `org.nonprofit.app` + `App`, `org.nonprofit.gui` (`GuiApp`, `MainWindow`, `gui.common`) | Data store, event bus, console menu, GUI window and shared GUI helpers, overall diagram, requirements doc | Singleton, Observer, MVC | [`output/core/core.puml`](output/core/core.puml), [`output/overall/overall.puml`](output/overall/overall.puml) | **Done** |
 
 **GUI screens.** Each module's GUI screen (`org.nonprofit.gui.<module>`: `<Module>Panel` + `<Module>GuiController`) belongs with that module's student; `GuiApp`, `MainWindow` and `gui.common` belong to Student 6. See [GUI (JavaFX)](#gui-javafx).
 
 \* Student 3 added the minimal shared core that Events needs: `Person`, `ContactPreference`, `EventBus` (Singleton + Observer), `SystemEvent`, `SystemEventType` and `SystemObserver`. Student 6 owns these files and builds on them. Other modules publish on `EventBus` and should add their own topics to `SystemEventType`. `Person.updateContact(...)` lets every module edit a person's name and contact details (the ID never changes, and a blank name is refused).
 
-**Source layout: one folder per pattern.** In the Donations, Events and Beneficiaries modules, every design pattern's classes sit together in their own sub-package; the screen is in `mvc`, the service and its data in `model`, and the module's demo / runner stays at the module root:
+**Source layout: one folder per pattern.** In every module, each design pattern's classes sit together in their own sub-package; the screen is in `mvc`, the service and its data in `model`, and the module's demo / runner stays at the module root:
 
 | Module | `mvc` | `model` | Pattern folders |
 |---|---|---|---|
 | `donation` | Controller, View | Service, Donor, Campaign, DonationForm, DonationType | `factorymethod` (creators + Donation products), `templatemethod` (DonationDocument, DonationReceipt, TaxStatement) |
 | `event` | Controller, View | Service, RegistrationResult, WaitlistEntry | `simplefactory` (EventFactory, EventType, Fundraiser, Workshop, OutreachProgram), `observer` (EventSubject, Event, EventObserver, EventChange, Attendee, EventBusNotifier), `decorator` (Ticket … TicketAddOn) |
 | `beneficiary` | Controller, View | Service, Beneficiary, Need, Urgency, Distribution | `strategy` (AllocationStrategy + 3 rules, AllocationMode), `templatemethod` (ImpactReport + 2) |
+| `volunteer` | Controller, View | Service, Volunteer, Task, HourEntry | `strategy` (AssignmentStrategy + 3 rules, AssignmentMode), `templatemethod` (Certificate, HoursCertificate, EventParticipationCertificate) |
+| `communication` | Controller, View | Service, Message, SentMessage | `strategy` (CommunicationChannel + 3 channels, ChannelSelector), `decorator` (MessageContent, PlainContent, ContentDecorator + 3) |
+| `app` | MainMenuController, MainMenuView | — | `singleton` (DataStore, BroadcastGroup); SampleData and SystemDemo stay at the root |
+| `core` | — | Person, ContactPreference, Audience | `observer` (EventBus, SystemObserver, SystemEvent, SystemEventType); EventBus is also the Singleton |
 
-`volunteer`, `communication`, `app` and `core` keep their flat layout. Each of these folders has its own class diagram in `output/<module>/<folder>.puml` (e.g. `output/event/observer.puml`), and `output/donation.puml`, `output/event.puml` and `output/beneficiary.puml` show all of a module's folders together. Because Java's package-private access stops at a package boundary, a few members that one folder's classes call from another are now `public` (e.g. `Event`'s registration bookkeeping, used by `EventService`; `Donor.addDonation`, used by `DonationCreator`). Their comments say who is meant to call them.
+Every folder has its own class diagram with an SVG next to it in `output/<module>/<folder>.puml` (e.g. `output/event/observer.puml`); `output/<module>/<module>.puml` shows all of a module's folders together, and `output/overall/overall.puml` shows every module, its folders and which folders depend on which. The diagrams are generated from the Java source.
 
 **Observer names.** The Observer code uses the lecture's names. In the Events module, `EventSubject` is the Subject interface (`registerObserver`, `removeObserver`), `Event` implements it and calls its protected `notifyObservers(...)`, and `EventObserver.update(...)` is the Observer. The system-wide `EventBus` keeps the shorter names `subscribe` / `unsubscribe` / `publish`, which are the lecture's `registerObserver` / `removeObserver` / `notifyObservers`; `SystemObserver.onEvent(...)` is `update()`.
 
@@ -161,7 +165,7 @@ Where each pattern can be seen in the window:
 
 JavaFX is not part of the JDK.
 
-1. Download the **JavaFX 21 SDK** (the *SDK*, not *jmods*) for your OS from <https://gluonhq.com/products/javafx/>: macOS Apple Silicon = aarch64, Intel Mac = x64, Windows x64, Linux x64.
+1. Download the **JavaFX 21 SDK** (a newer SDK such as 22 also works; keep the folder name below) (the *SDK*, not *jmods*) for your OS from <https://gluonhq.com/products/javafx/>: macOS Apple Silicon = aarch64, Intel Mac = x64, Windows x64, Linux x64.
 2. Unzip it and rename/move the folder so the jars are at **`SDP/lib/javafx-sdk-21/lib/`** (e.g. `SDP/lib/javafx-sdk-21/lib/javafx.controls.jar`).
 3. The folder is in `.gitignore` because it is different for each OS: never commit it.
 4. macOS: if Gatekeeper blocks the native libraries when the window opens, run `xattr -dr com.apple.quarantine SDP/lib/javafx-sdk-21`.
@@ -174,14 +178,14 @@ From the `SDP` folder, macOS / Linux:
 
 ```sh
 javac --release 17 --module-path lib/javafx-sdk-21/lib --add-modules javafx.controls -d bin $(find src -name "*.java")
-java --module-path lib/javafx-sdk-21/lib --add-modules javafx.controls -cp bin org.nonprofit.gui.GuiApp
+java --module-path lib/javafx-sdk-21/lib --add-modules javafx.controls --enable-native-access=javafx.graphics -cp bin org.nonprofit.gui.GuiApp
 ```
 
 Windows PowerShell (paths use `\`; a classpath with several entries would use `;`):
 
 ```powershell
 javac --release 17 --module-path lib\javafx-sdk-21\lib --add-modules javafx.controls -d bin (Get-ChildItem -Recurse -Filter *.java src | % FullName)
-java --module-path lib\javafx-sdk-21\lib --add-modules javafx.controls -cp bin org.nonprofit.gui.GuiApp
+java --module-path lib\javafx-sdk-21\lib --add-modules javafx.controls --enable-native-access=javafx.graphics -cp bin org.nonprofit.gui.GuiApp
 ```
 
 ### Without JavaFX
@@ -197,9 +201,9 @@ java -cp bin App
 
 ## Diagrams
 
-The class diagrams are PlantUML files in the top-level **`output/`** folder: one per package plus `output/overall.puml` for the whole system. Each file's header comment says where it came from:
+The class diagrams are PlantUML files in the top-level **`output/`** folder: one per package plus `output/overall/overall.puml` for the whole system. Each file's header comment says where it came from:
 
-- `output/core.puml` and `output/event.puml` started as output of the team's UML generator and were regrouped by pattern; they are now kept up to date by hand (last updated from the source on 2026-11-03). Regenerating them would lose the grouping.
-- `output/donation.puml`, `output/volunteer.puml`, `output/beneficiary.puml`, `output/communication.puml` and `output/overall.puml` are written by hand from the source.
+- `output/core/core.puml` and `output/event/event.puml` started as output of the team's UML generator and were regrouped by pattern; they are now kept up to date by hand (last updated from the source on 2026-11-03). Regenerating them would lose the grouping.
+- `output/donation/donation.puml`, `output/volunteer/volunteer.puml`, `output/beneficiary/beneficiary.puml`, `output/communication/communication.puml` and `output/overall/overall.puml` are written by hand from the source.
 - When the code changes, update the matching diagram by hand.
 - All of them show only the important members. You can view any of them with the VS Code *PlantUML* extension, or check them with `plantuml -checkonly output/*.puml`.

@@ -3,11 +3,19 @@ package org.nonprofit.volunteer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
-import org.nonprofit.core.SystemObserver;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemEventType;
+import org.nonprofit.core.observer.SystemObserver;
+import org.nonprofit.volunteer.strategy.AssignmentMode;
+import org.nonprofit.volunteer.strategy.AssignmentStrategy;
+import org.nonprofit.volunteer.strategy.AvailabilityBasedAssignment;
+import org.nonprofit.volunteer.strategy.PreferenceBasedAssignment;
+import org.nonprofit.volunteer.strategy.SkillBasedAssignment;
+import org.nonprofit.volunteer.model.Task;
+import org.nonprofit.volunteer.model.Volunteer;
+import org.nonprofit.volunteer.model.VolunteerService;
 
 /**
  * Stand-alone walkthrough of the Volunteers module, showing each pattern.

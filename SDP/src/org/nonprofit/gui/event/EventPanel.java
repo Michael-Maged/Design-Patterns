@@ -4,12 +4,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
-import org.nonprofit.event.Attendee;
-import org.nonprofit.event.Event;
-import org.nonprofit.event.Fundraiser;
-import org.nonprofit.event.OutreachProgram;
-import org.nonprofit.event.Ticket;
-import org.nonprofit.event.Workshop;
+import org.nonprofit.event.observer.Attendee;
+import org.nonprofit.event.observer.Event;
+import org.nonprofit.event.simplefactory.Fundraiser;
+import org.nonprofit.event.simplefactory.OutreachProgram;
+import org.nonprofit.event.decorator.Ticket;
+import org.nonprofit.event.simplefactory.Workshop;
 import org.nonprofit.gui.common.Ui;
 
 import javafx.geometry.Insets;

@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import org.nonprofit.app.DataStore;
+import org.nonprofit.app.singleton.DataStore;
 import org.nonprofit.gui.common.Dialogs;
 import org.nonprofit.gui.common.NotificationFeed;
 import org.nonprofit.gui.common.Ui;

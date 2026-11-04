@@ -2,8 +2,8 @@ package org.nonprofit.donation;
 
 import java.time.LocalDate;
 
-import org.nonprofit.communication.CommunicationService;
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.communication.model.CommunicationService;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.donation.model.Campaign;
 import org.nonprofit.donation.factorymethod.Donation;
 import org.nonprofit.donation.templatemethod.DonationDocument;

@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemEventType;
 import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.event.decorator.BasicTicket;
 import org.nonprofit.event.observer.Event;

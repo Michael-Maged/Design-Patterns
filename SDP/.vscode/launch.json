@@ -6,7 +6,7 @@
             "name": "GUI (JavaFX)",
             "request": "launch",
             "mainClass": "org.nonprofit.gui.GuiApp",
-            "vmArgs": "--module-path lib/javafx-sdk-21/lib --add-modules javafx.controls"
+            "vmArgs": "--module-path lib/javafx-sdk-21/lib --add-modules javafx.controls --enable-native-access=javafx.graphics"
         },
         {
             "type": "java",

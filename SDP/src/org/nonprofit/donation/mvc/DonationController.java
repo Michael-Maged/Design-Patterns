@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEventType;
 import org.nonprofit.donation.model.Campaign;
 import org.nonprofit.donation.factorymethod.Donation;
 import org.nonprofit.donation.model.DonationForm;

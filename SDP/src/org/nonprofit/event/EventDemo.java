@@ -4,9 +4,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEventType;
 import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.event.decorator.BasicTicket;
 import org.nonprofit.event.model.EventService;

@@ -4,9 +4,9 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import org.nonprofit.gui.common.Ui;
-import org.nonprofit.volunteer.AssignmentMode;
-import org.nonprofit.volunteer.Task;
-import org.nonprofit.volunteer.Volunteer;
+import org.nonprofit.volunteer.strategy.AssignmentMode;
+import org.nonprofit.volunteer.model.Task;
+import org.nonprofit.volunteer.model.Volunteer;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;

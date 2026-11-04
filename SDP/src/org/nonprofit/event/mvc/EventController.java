@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Supplier;
 
-import org.nonprofit.core.ContactPreference;
+import org.nonprofit.core.model.ContactPreference;
 import org.nonprofit.event.observer.Attendee;
 import org.nonprofit.event.observer.Event;
 import org.nonprofit.event.model.EventService;

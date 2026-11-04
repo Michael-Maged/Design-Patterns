@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.nonprofit.core.Audience;
-import org.nonprofit.core.ContactPreference;
-import org.nonprofit.core.EventBus;
-import org.nonprofit.core.SystemEvent;
-import org.nonprofit.core.SystemEventType;
+import org.nonprofit.core.model.Audience;
+import org.nonprofit.core.model.ContactPreference;
+import org.nonprofit.core.observer.EventBus;
+import org.nonprofit.core.observer.SystemEvent;
+import org.nonprofit.core.observer.SystemEventType;
 import org.nonprofit.beneficiary.strategy.AllocationMode;
 import org.nonprofit.beneficiary.strategy.AllocationStrategy;
 import org.nonprofit.beneficiary.mvc.BeneficiaryController;
